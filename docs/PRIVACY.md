@@ -19,6 +19,7 @@ address from any of these requests.
 | Your news feed (by default [BBC World](https://feeds.bbci.co.uk/news/world/rss.xml)) | Home | when the last copy of the feed expires, and news feeds usually declare a very short lifetime: in practice every few minutes (see the note below) | a request for that feed, plus your home IP address |
 | [FreeIPAPI](https://freeipapi.com/) | Home | when the panel asks Home for an approximate location | your home IP address, which it uses to estimate a location |
 | [Open-Meteo Geocoding API](https://open-meteo.com/en/terms) | your phone's browser, from the panel | only when you search for a town | the text you typed, your phone's IP address and ordinary browser request data |
+| [PokéAPI](https://pokeapi.co/) and GitHub (`raw.githubusercontent.com/PokeAPI/sprites`) | Home | only while Pokémon is enabled, once per UTC day; failed downloads retry after at least 30 minutes | the daily Pokémon number, your public IP address and the software User-Agent; no location or pairing data |
 | `pool.ntp.org` time servers | Home | at start and then hourly | time requests, plus your home IP address |
 
 Requests from Home identify the software with the User-Agent

@@ -58,6 +58,13 @@ same three compositions as the weather.
 </p>
 <p align="center"><sub>Sky (Warsaw, equinox) and Air (Berlin, May), drawn from sample data by the 0.5.0 renderer</sub></p>
 
+## Pokémon of the day (local development build)
+
+This checkout adds an optional Pokémon screen: a sprite and English Pokédex
+introduction, downloaded directly by the device and cached for the day. Enable
+it under **Home → Pokémon** in the phone panel. No backend or API key is needed.
+See [setup and implementation notes](docs/POKEMON.md).
+
 ## Your brush
 
 Four pigments and no grey mean every tone on this display is a pattern. Since 0.5.0 the

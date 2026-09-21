@@ -127,6 +127,8 @@ static bool screen_has_data(int s)
         return c->note[0] != 0;
     case HOME_SKY:
         return c->location_ready; /* computed on the device, nothing to download */
+    case HOME_POKEMON:
+        return d->pokemon.meta.valid;
     case HOME_AIR:
         return c->location_ready && d->air.meta.valid;
     default:
@@ -577,9 +579,9 @@ void app_main(void)
                 home_store_stats(&copy);
             home_lock();
             home_source_meta_t *meta[] = {&home_runtime.data.weather.meta,
-                                          &home_runtime.data.feed.meta,
-                                          &home_runtime.data.air.meta};
-            for (int i = 0; i < 3; i++)
+                                          &home_runtime.data.feed.meta, &home_runtime.data.air.meta,
+                                          &home_runtime.data.pokemon.meta};
+            for (int i = 0; i < 4; i++)
                 if (meta[i]->valid && meta[i]->expires_at < now && meta[i]->state == HOME_READY) {
                     meta[i]->state = HOME_STALE;
                     home_runtime.dirty = true;

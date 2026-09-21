@@ -574,6 +574,19 @@ void home_sources_task(void *unused)
             }
             home_unlock();
         }
+        if (c->enabled[HOME_POKEMON] && now >= d->pokemon.meta.next_fetch) {
+            esp_err_t fetched = home_fetch_pokemon(&d->pokemon, now);
+            home_lock();
+            if (home_runtime.config.enabled[HOME_POKEMON]) {
+                home_runtime.data.pokemon = d->pokemon;
+                if (fetched == ESP_OK)
+                    home_runtime.counters.fetches++;
+                home_runtime.dirty = true;
+                home_runtime.request_id++;
+                changed = true;
+            }
+            home_unlock();
+        }
         if (changed) {
             home_lock();
             esp_err_t e = home_store_data(&home_runtime.data, &home_runtime.config);

@@ -1,6 +1,7 @@
 #include "home_fetch.h"
 #include "home_parse.h"
 #include "home_air.h"
+#include "home_pokemon.h"
 #include "esp_tls.h"
 #include "esp_crt_bundle.h"
 #include "esp_timer.h"
@@ -1094,6 +1095,65 @@ esp_err_t home_fetch_air(const home_config_t *c, home_air_t *a, int64_t now)
         if (h.status && h.status != 200)
             snprintf(error, sizeof(error), "Air HTTP %d", h.status);
         failed(&a->meta, &h, now, error);
+    }
+    return e;
+}
+
+/* Both requests are fixed-host, bounded and certificate-verified. Commit text
+ * and pixels together, so failures leave the previous complete card available. */
+esp_err_t home_fetch_pokemon(home_pokemon_t *p, int64_t now)
+{
+    unsigned id = home_pokemon_id(now);
+    if (!id || now < p->meta.next_fetch)
+        return ESP_ERR_INVALID_STATE;
+    home_pokemon_t *candidate = calloc(1, sizeof(*candidate));
+    headers_t h = {0};
+    home_source_meta_t validators = {0};
+    char url[160], *body = NULL;
+    size_t size = 0;
+    esp_err_t e = ESP_ERR_NO_MEM;
+    const char *error = "Pokemon allocation failed";
+    if (!candidate)
+        goto done;
+    snprintf(url, sizeof url, "https://pokeapi.co/api/v2/pokemon-species/%u/", id);
+    error = "Pokemon description unavailable";
+    e = fetch_scoped(url, &validators, &h, &body, &size, "pokeapi.co");
+    if (e != ESP_OK)
+        goto done;
+    if (!home_pokemon_parse(body, size, id, candidate)) {
+        e = ESP_FAIL;
+        goto done;
+    }
+    metadata(&candidate->meta, &h, now, true);
+    bool no_store = candidate->meta.no_store;
+    free(body);
+    body = NULL;
+    snprintf(url, sizeof url,
+             "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/%u.png", id);
+    error = "Pokemon sprite unavailable";
+    e = fetch_scoped(url, &validators, &h, &body, &size, "raw.githubusercontent.com");
+    if (e != ESP_OK)
+        goto done;
+    if (!home_pokemon_png((const uint8_t *)body, size, candidate->sprite)) {
+        e = ESP_FAIL;
+        goto done;
+    }
+    metadata(&candidate->meta, &h, now, true);
+    candidate->meta.no_store |= no_store;
+    candidate->meta.issued_at = now - now % 86400;
+    /* One complete cached card per UTC day, also across restarts. Manual refresh
+     * does not clear this deadline. No repeated requests for an unchanged card. */
+    candidate->meta.expires_at = candidate->meta.issued_at + 86400;
+    candidate->meta.next_fetch = candidate->meta.expires_at;
+    candidate->sprite_version = HOME_POKEMON_SPRITE_VERSION;
+    *p = *candidate;
+done:
+    free(body);
+    free(candidate);
+    if (e != ESP_OK) {
+        failed(&p->meta, &h, now, error);
+        if (p->meta.next_fetch < now + 1800)
+            p->meta.next_fetch = now + 1800;
     }
     return e;
 }

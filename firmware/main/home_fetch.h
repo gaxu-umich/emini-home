@@ -13,6 +13,7 @@ esp_err_t home_fetch_feed(const home_config_t*,home_feed_t*,int64_t now);
  * never carry the coordinates to another provider. Caller checks that the
  * Air screen is on and a place is saved. */
 esp_err_t home_fetch_air(const home_config_t*,home_air_t*,int64_t now);
+esp_err_t home_fetch_pokemon(home_pokemon_t *, int64_t now);
 /* Explicit area lookup only; fixed FreeIPAPI hostname, same verified transport.
  * Single source-worker caller. Caller zeroes/frees the bounded JSON body. */
 esp_err_t home_fetch_location(char **json,size_t *size);

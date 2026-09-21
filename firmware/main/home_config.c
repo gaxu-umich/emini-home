@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *screens[] = {"weather", "feed", "note", "sky", "air"};
+static const char *screens[] = {"weather", "feed", "note", "sky", "air", "pokemon"};
 static const char *styles[] = {"print", "rhythm", "atlas", "cycle"};
 static const char *modes[] = {"fixed", "day", "rotate"};
 const char *home_screen_name(int n)
@@ -78,7 +78,7 @@ void home_config_defaults(home_config_t *c)
     strcpy(c->feed_url, "https://feeds.bbci.co.uk/news/world/rss.xml");
     c->location_ready = false;
     for (int i = 0; i < HOME_SCREEN_COUNT; i++) {
-        /* Sky and Air are off out of the box and keep the first composition. */
+        /* Additional screens start disabled and use the first composition. */
         c->enabled[i] = i <= HOME_NOTE;
         c->order[i] = i;
         c->style[i] = i <= HOME_ATLAS ? i : HOME_PRINT;
@@ -288,9 +288,10 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
     unsigned seen = 0;
     /* Settings and recipes written before 0.5.0 list the first three screens. */
     int listed = cJSON_IsArray(a) ? cJSON_GetArraySize(a) : 0;
-    REQUIRE(cJSON_IsArray(a) && cJSON_IsArray(o) && (listed == 3 || listed == HOME_SCREEN_COUNT) &&
+    REQUIRE(cJSON_IsArray(a) && cJSON_IsArray(o) &&
+                (listed == 3 || listed == 5 || listed == HOME_SCREEN_COUNT) &&
                 cJSON_GetArraySize(o) == listed,
-            "Expected three or five screens");
+            "Expected three, five or six screens");
     for (int i = 0; i < listed; i++) {
         cJSON *v = cJSON_GetArrayItem(a, i);
         REQUIRE(cJSON_IsBool(v), "Invalid enabled screens");
@@ -298,12 +299,12 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
         any |= c.enabled[i];
         v = cJSON_GetArrayItem(o, i);
         n = cJSON_IsString(v) ? home_screen_index(v->valuestring) : -1;
-        REQUIRE(n >= 0 && !(seen & (1U << n)), "Invalid screen order");
+        REQUIRE(n >= 0 && n < listed && !(seen & (1U << n)), "Invalid screen order");
         seen |= 1U << n;
         c.order[i] = n;
     }
     /* A screen the record does not mention stays off and goes last in the
-     * order, which keeps order[] a permutation of all five. */
+     * order, which keeps order[] a permutation of all screens. */
     for (int i = listed, at = listed; i < HOME_SCREEN_COUNT; i++) {
         c.enabled[i] = false;
         for (int n2 = 0; n2 < HOME_SCREEN_COUNT; n2++)
@@ -317,7 +318,7 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
     cJSON *st = get(j, "styles");
     REQUIRE(known(st, screens, HOME_SCREEN_COUNT), "Invalid styles");
     for (int i = 0; i < HOME_SCREEN_COUNT; i++) {
-        /* Sky and Air are optional here for the same reason as the arrays above. */
+        /* Additional screens are optional in older records. */
         if (i > HOME_NOTE && !get(st, screens[i]))
             continue;
         n = choice(st, screens[i], styles, 4);
@@ -561,6 +562,7 @@ int home_auto_screen(const home_config_t *c, const home_data_t *d, const struct 
      * place and a downloaded reading, like the weather. */
     ready.enabled[HOME_SKY] &= c->location_ready;
     ready.enabled[HOME_AIR] &= c->location_ready && d->air.meta.valid;
+    ready.enabled[HOME_POKEMON] &= d->pokemon.meta.valid;
     bool ready_any = false;
     for (int i = 0; i < HOME_SCREEN_COUNT; i++)
         ready_any |= ready.enabled[i];
