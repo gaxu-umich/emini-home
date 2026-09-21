@@ -33,9 +33,9 @@
   }
   const boot = createBootGuard(root);
   if (boot) root.HomeBoot = boot;
-  // Since 0.5.0 five screens; "sky" and "air" are off by default and come last.
+  // Additional screens start disabled; older three/five-screen recipes still work.
   // Settings and recipes written before 0.5.0 list only the first three (LEGACY).
-  const screens = ["weather", "feed", "note", "sky", "air"];
+  const screens = ["weather", "feed", "note", "sky", "air", "pokemon"];
   const LEGACY = 3;
   // "cycle" = Print, Rhythm and Atlas take turns (D-HOME-CC-18). Previews never send it.
   const styles = ["print", "rhythm", "atlas", "cycle"];
@@ -378,7 +378,7 @@
     const s = status && status.sources;
     if (!s || typeof s !== "object") return null;
     return JSON.stringify(
-      ["weather", "feed"].map((k) => [
+      ["weather", "feed", "air", "pokemon"].map((k) => [
         s[k]?.fetched_at ?? null,
         s[k]?.valid ?? null,
       ]),
@@ -587,9 +587,10 @@
         c.interval_min >= 5 &&
         c.interval_min <= 1440,
     );
-    // Same shapes as home_config.c: three (before 0.5.0) or all five screens.
+    // Same shapes as home_config.c: three, five or all six screens.
     const listed = (x) =>
-      Array.isArray(x) && (x.length === LEGACY || x.length === screens.length);
+      Array.isArray(x) &&
+      (x.length === LEGACY || x.length === 5 || x.length === screens.length);
     check(
       "enabled",
       listed(c.enabled) &&

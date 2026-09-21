@@ -78,3 +78,13 @@ the licence in `licenses/esp-idf/wpa_supplicant/README`: Copyright (c)
 ZECTRIX and NOTE4C may be trademarks of their owner. The author bought the
 NOTE4C used for development at the retail price. emini Home is an independent
 project, not made or sponsored by ZECTRIX.
+
+## Pokémon screen (optional)
+
+The optional screen retrieves descriptions from [PokéAPI](https://pokeapi.co/docs/v2)
+and sprites from [PokeAPI/sprites](https://github.com/PokeAPI/sprites).
+Responses are cached on the device in accordance with PokéAPI's fair-use policy.
+Pokémon names, artwork and game text belong to their respective rights holders;
+the repository's MIT license does not relicense that content. This project is
+not affiliated with or endorsed by Pokémon, Nintendo, Game Freak or Creatures.
+No Pokémon artwork is embedded in the firmware or committed as a test fixture.

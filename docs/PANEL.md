@@ -60,7 +60,7 @@ to open a new one.
 
 The **On your Home** section shows the last picture the display confirmed, pixel
 for pixel, with its status and the battery. Below it, **Your screens** lists the
-five kinds of information:
+six kinds of information:
 
 | Screen | What it shows |
 | --- | --- |
@@ -69,6 +69,7 @@ five kinds of information:
 | Your note | A few words of your own |
 | Sky | Sunrise, sunset and the moon, worked out on the device from the place you set; nothing is downloaded |
 | Air | Air quality, UV and pollen from Open-Meteo for the place you set |
+| Pokémon | One of the original 151 each day, with a sprite and English Pokédex introduction |
 
 Sky and Air are new, and they start switched off: your display keeps showing
 what it showed before. Air's picture arrives with the next update, so until then
@@ -132,6 +133,20 @@ switched on, about once an hour, and sends it the saved coordinates and
 nothing else.
 
 <p align="center"><img src="images/panel-air.webp" width="260" alt="The Air screen page in the panel: the Open-Meteo source line and the choice of the headline number"></p>
+
+### Pokémon of the day
+
+Open **Home → Pokémon**, enable **In your collection**, and tap **Save settings**.
+The device fetches a sprite and English introduction directly from PokéAPI and
+its GitHub sprite repository. No server, account, API key or location is needed.
+Wait for the preview to load, then tap **Show now**, or include it in your rotation.
+
+The choice changes at midnight UTC, cycling through the original 151 Pokémon.
+Print and Rhythm place the sprite on the left; Atlas places it on the right.
+Sprites use the panel's four colours, so other colours are approximated.
+The cached card survives restarts; when a download fails, the previous card stays
+available and the device retries after at least 30 minutes. Quiet hours still apply.
+Turning the screen off stops subsequent downloads. See [Pokémon implementation](POKEMON.md).
 
 ### Compositions
 

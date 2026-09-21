@@ -18,6 +18,7 @@ typedef struct {
     char feed_url[HOME_FEED_URL_BYTES];
     home_data_t data;
 } cache_t;
+_Static_assert(sizeof(cache_t) <= STORE_MAX, "Source cache exceeds NVS record budget");
 static const char *TAG = "home_store";
 static nvs_handle_t handle;
 static uint32_t sequence[4];
@@ -140,6 +141,8 @@ esp_err_t home_store_init(home_config_t *c, home_data_t *d, home_secrets_t *s)
                 d->weather = cache->data.weather;
                 d->air = cache->data.air;
             }
+            if (cache->data.pokemon.sprite_version == HOME_POKEMON_SPRITE_VERSION)
+                d->pokemon = cache->data.pokemon;
             if (!strcmp(cache->feed_url, c->feed_url))
                 d->feed = cache->data.feed;
         }
@@ -168,6 +171,10 @@ esp_err_t home_store_init(home_config_t *c, home_data_t *d, home_secrets_t *s)
     d->weather.meta.error[96] = 0;
     d->feed.meta.error[96] = 0;
     d->air.meta.error[96] = 0;
+    d->pokemon.meta.error[96] = 0;
+    d->pokemon.name[64] = 0;
+    d->pokemon.genus[64] = 0;
+    d->pokemon.introduction[512] = 0;
     d->feed.title[256] = 0;
     d->feed.source[96] = 0;
     d->feed.url[512] = 0;
@@ -201,6 +208,8 @@ esp_err_t home_store_data(const home_data_t *d, const home_config_t *c)
         memset(&p->data.feed, 0, sizeof(p->data.feed));
     if (p->data.air.meta.no_store)
         memset(&p->data.air, 0, sizeof(p->data.air));
+    if (p->data.pokemon.meta.no_store)
+        memset(&p->data.pokemon, 0, sizeof(p->data.pokemon));
     esp_err_t e = put(1, p, sizeof(*p));
     free(p);
     return e;

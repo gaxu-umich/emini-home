@@ -307,7 +307,8 @@ static esp_err_t status(httpd_req_t *r, int token)
         cJSON *sources = ok ? cJSON_AddObjectToObject(j, "sources") : NULL;
         ok = ok && sources && json_child(sources, "weather", meta_json(&h->data.weather.meta)) &&
              json_child(sources, "feed", feed_json(&h->data.feed)) &&
-             json_child(sources, "air", meta_json(&h->data.air.meta));
+             json_child(sources, "air", meta_json(&h->data.air.meta)) &&
+             json_child(sources, "pokemon", meta_json(&h->data.pokemon.meta));
     }
     home_unlock();
     if (!ok) {

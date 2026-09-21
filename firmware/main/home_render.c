@@ -15,7 +15,7 @@
 
 enum { BLACK = 0, PAPER = 1, YELLOW = 2, RED = 3, W = 400, H = 300 };
 #ifndef HOME_VERSION_TEXT
-#define HOME_VERSION_TEXT "0.5.2"
+#define HOME_VERSION_TEXT "0.5.4-pokemon-outline"
 #endif
 /* Brushes (D-HOME-CC-23, narrowed by D-HOME-CC-25): the user picks the tone structure in the
  * panel. The line-based screens (engraving, cross-hatch) were dropped after the device test:
@@ -2268,6 +2268,56 @@ static void sky(canvas_t *c, const home_config_t *cfg, int64_t now)
     c->raster = RASTER_NOISE;
     sky_footer(c, cfg, now);
 }
+static void pokemon(canvas_t *c, const home_config_t *cfg, const home_pokemon_t *p, int64_t now)
+{
+    top(c, cfg, "POKEMON OF THE DAY");
+    if (!p->meta.valid) {
+        txt(c, 14, 60, 372, 65, 3, "Meet a Pokemon each day.");
+        txt(c, 14, 145, 372, 100, 1,
+            p->meta.state == HOME_ERROR
+                ? "Could not download today's Pokemon. Home will retry in 30 minutes."
+                : "Enable Pokemon in your phone panel and connect Home to Wi-Fi. A sprite and introduction will appear here.");
+        return;
+    }
+    char title[96];
+    snprintf(title, sizeof title, "#%03u  %s", p->id, p->name);
+    int style = cfg->style[HOME_POKEMON];
+    int sx = style == HOME_ATLAS ? 194 : 8, sy = 60;
+    int tx = style == HOME_ATLAS ? 14 : 208;
+    if (style == HOME_RHYTHM) {
+        sx = 8;
+        sy = 64;
+    }
+    txt(c, 14, 36, 372, 30, cfg->large_text ? 2 : 1, title);
+    int left = 96, right = -1, above = 96, below = -1;
+    for (int y = 0; y < 96; y++)
+        for (int x = 0; x < 96; x++) {
+            unsigned at = y * 96 + x, color = (p->sprite[at / 4] >> (6 - 2 * (at % 4))) & 3;
+            if (color != PAPER) {
+                left = imin(left, x);
+                right = imax(right, x);
+                above = imin(above, y);
+                below = imax(below, y);
+            }
+        }
+    if (right >= left && below >= above) {
+        int zoom = imin(4, imin(192 / (right - left + 1), 192 / (below - above + 1)));
+        int ox = sx + (192 - zoom * (right - left + 1)) / 2;
+        int oy = sy + (192 - zoom * (below - above + 1)) / 2;
+        for (int y = above; y <= below; y++)
+            for (int x = left; x <= right; x++) {
+                unsigned at = y * 96 + x, color = (p->sprite[at / 4] >> (6 - 2 * (at % 4))) & 3;
+                if (!c->intensity && color >= 2)
+                    color = BLACK;
+                rect(c, ox + zoom * (x - left), oy + zoom * (y - above), zoom, zoom, color);
+            }
+    }
+    txt(c, tx, 76, 178, 42, 1, p->genus);
+    txt(c, tx, 122, 178, 130, cfg->large_text ? 1 : 0, p->introduction);
+    if (style == HOME_RHYTHM)
+        rect(c, 202, 74, 2, 170, RED);
+    source_footer(c, cfg, &p->meta, now, "PokeAPI / Pokemon", p->meta.fetched_at);
+}
 void home_render(const home_config_t *cfg, const home_data_t *data, home_screen_t screen,
                  int64_t now, uint8_t frame[HOME_FRAME_BYTES])
 {
@@ -2290,6 +2340,8 @@ void home_render(const home_config_t *cfg, const home_data_t *data, home_screen_
         feed(&c, cfg, &data->feed, now);
     else if (screen == HOME_AIR)
         air(&c, cfg, &data->air, now);
+    else if (screen == HOME_POKEMON)
+        pokemon(&c, cfg, &data->pokemon, now);
     else if (screen == HOME_NOTE)
         note(&c, cfg, now);
     else {

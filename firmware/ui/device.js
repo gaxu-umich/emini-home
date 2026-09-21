@@ -96,6 +96,10 @@
       note: "Your note",
       sky: "Sky",
       air: "Air",
+      pokemon: "Pokémon",
+      pokemonDesc: "A daily sprite and Pokédex introduction",
+      pokemonSource:
+        "One of the original 151 Pokémon each day (changes at midnight UTC). English introductions and sprites from PokéAPI, cached on your device. Enable this screen and save to start downloading. No account or API key needed.",
       weatherDesc: "The pulse of your place",
       feedDesc: "News from around the world",
       noteDesc: "A few words of your own",
@@ -371,6 +375,10 @@
       note: "Twoja kartka",
       sky: "Niebo",
       air: "Powietrze",
+      pokemon: "Pokémon",
+      pokemonDesc: "Codzienny obrazek i opis z Pokédexu",
+      pokemonSource:
+        "Codziennie jeden ze 151 oryginalnych Pokémonów (zmiana o północy UTC). Angielskie opisy i obrazki z PokéAPI są zapisywane na urządzeniu. Włącz ekran i zapisz ustawienia, aby rozpocząć pobieranie. Bez konta i klucza API.",
       weatherDesc: "Puls Twojego miejsca",
       feedDesc: "Wiadomości ze świata",
       noteDesc: "Kilka własnych słów",
@@ -653,6 +661,8 @@
     feed: '<path d="M5 4h14v17H5V4ZM8 8h8m-8 4h8m-8 4h5"/>',
     note: '<path d="M4 3h16v13l-5 5H4V3Zm11 18v-5h5M8 8h8m-8 4h5"/>',
     sky: '<path d="M3 17a9 9 0 0 1 18 0"/><path d="M1 17h2m18 0h2M12 4v2M5.6 7.6 7 9m10.4-1.4L16 9"/><circle cx="12" cy="17" r="3"/>',
+    pokemon:
+      '<circle cx="12" cy="12" r="9"/><path d="M3 12h6m6 0h6"/><circle cx="12" cy="12" r="3"/>',
     air: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/>',
     palette:
       '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/>',
@@ -1016,19 +1026,21 @@
               'maxlength="512" inputmode="url" placeholder="https://…" autocomplete="off"',
               "feedHelp",
             )
-          : s === "sky"
-            ? `<p class="hint">${t("skySource")}</p>`
-            : s === "air"
-              ? `<p class="hint">${t("airSource")}</p>${select(
-                  "air_main",
-                  "airMain",
-                  [
-                    ["eu", t("airEU")],
-                    ["us", t("airUS")],
-                    ["pm25", t("airPM")],
-                  ],
-                )}`
-              : `<label class="field"><span>${t("noteText")}</span><textarea data-path="note" maxlength="240" rows="5" placeholder="${say("What matters today?", "Co jest dziś ważne?")}">${esc(S.draft.note)}</textarea><small>${t("noteHelp")}<span id="note-count">${noteSpace(S.draft.note)}</span><progress id="note-meter" max="100" value="${Math.min(100, C.noteUsage(S.draft.note).percent)}" aria-label="${esc(noteSpace(S.draft.note))}"></progress></small></label>`
+          : s === "pokemon"
+            ? `<p class="hint">${t("pokemonSource")}</p>`
+            : s === "sky"
+              ? `<p class="hint">${t("skySource")}</p>`
+              : s === "air"
+                ? `<p class="hint">${t("airSource")}</p>${select(
+                    "air_main",
+                    "airMain",
+                    [
+                      ["eu", t("airEU")],
+                      ["us", t("airUS")],
+                      ["pm25", t("airPM")],
+                    ],
+                  )}`
+                : `<label class="field"><span>${t("noteText")}</span><textarea data-path="note" maxlength="240" rows="5" placeholder="${say("What matters today?", "Co jest dziś ważne?")}">${esc(S.draft.note)}</textarea><small>${t("noteHelp")}<span id="note-count">${noteSpace(S.draft.note)}</span><progress id="note-meter" max="100" value="${Math.min(100, C.noteUsage(S.draft.note).percent)}" aria-label="${esc(noteSpace(S.draft.note))}"></progress></small></label>`
     }</div></div><div class="form-section"><h2>${say("How it looks", "Jak wygląda")}</h2><div class="fields">${select(
       "styles." + s,
       "layout",
@@ -1988,6 +2000,7 @@
         sources?.feed?.valid === true &&
         !!sources.feed.title
       );
+    if (screen === "pokemon") return sources?.pokemon?.valid === true;
     if (screen === "sky")
       return (
         c.location_ready !== false &&
@@ -2249,7 +2262,7 @@
       .map(([l, k]) => `<dt>${t(l)}</dt><dd>${esc(formatTime(v[k]))}</dd>`)
       .join(
         "",
-      )}</dl><p class="hint">${S.lang === "pl" ? "Godziny według:" : "Times shown in:"} ${esc(C.formatTimestamp(1, S.lang, S.config?.timezone || "UTC", S.config?.clock24 !== false)?.zone || "UTC")}</p>${v.error ? `<p class="error-text">${t("failed")}</p>` : ""}${s === "air" ? `<p class="hint">${t("airSource")}</p>` : ""}<button data-action="refresh" data-source="${s}">${t("refreshSource")}</button></div></details>`;
+      )}</dl><p class="hint">${S.lang === "pl" ? "Godziny według:" : "Times shown in:"} ${esc(C.formatTimestamp(1, S.lang, S.config?.timezone || "UTC", S.config?.clock24 !== false)?.zone || "UTC")}</p>${v.error ? `<p class="error-text">${t("failed")}</p>` : ""}${s === "air" ? `<p class="hint">${t("airSource")}</p>` : ""}${s === "pokemon" ? `<p class="hint">${t("pokemonSource")}</p>` : `<button data-action="refresh" data-source="${s}">${t("refreshSource")}</button>`}</div></details>`;
   }
   function screenView() {
     return S.editorOpen ? editor() : overview();

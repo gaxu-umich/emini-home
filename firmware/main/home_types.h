@@ -5,16 +5,22 @@
 #include <stddef.h>
 
 #define HOME_SCHEMA 1
-/* Since 0.5.0 five screens. Settings saved by 0.4.x list three: the decoder
- * appends the missing ones at the end of the order, switched off, so the record
- * stays readable and the schema does not change. */
-#define HOME_SCREEN_COUNT 5
+/* Six screens. Older three/five-screen settings remain readable; new screens
+ * are appended to the order and disabled until explicitly enabled. */
+#define HOME_SCREEN_COUNT 6
 /* Moments of the "Day rhythm", not screens: three, as in every version so far. */
 #define HOME_DAY_SLOTS 3
 #define HOME_FRAME_BYTES 30000
 #define HOME_NOTE_BYTES 241
 #define HOME_FEED_URL_BYTES 513
-typedef enum { HOME_WEATHER=0, HOME_FEED=1, HOME_NOTE=2, HOME_SKY=3, HOME_AIR=4 } home_screen_t;
+typedef enum {
+    HOME_WEATHER = 0,
+    HOME_FEED = 1,
+    HOME_NOTE = 2,
+    HOME_SKY = 3,
+    HOME_AIR = 4,
+    HOME_POKEMON = 5
+} home_screen_t;
 typedef enum { HOME_FIXED=0, HOME_DAY=1, HOME_ROTATE=2 } home_mode_t;
 /* HOME_CYCLE is stored in the config only; drawing always gets one of the first three. */
 typedef enum { HOME_PRINT=0, HOME_RHYTHM=1, HOME_ATLAS=2, HOME_CYCLE=3 } home_style_t;
@@ -97,10 +103,20 @@ typedef struct {
     int16_t european_aqi, us_aqi; /* -1 when absent */
     double pollen[HOME_POLLEN_COUNT]; /* alder, birch, grass, mugwort */
 } home_air_t;
+#define HOME_POKEMON_SPRITE_VERSION 2
+#define HOME_POKEMON_SIDE 96
+#define HOME_POKEMON_BYTES (HOME_POKEMON_SIDE * HOME_POKEMON_SIDE / 4)
+typedef struct {
+    home_source_meta_t meta;
+    uint16_t id, sprite_version;
+    char name[65], genus[65], introduction[513];
+    uint8_t sprite[HOME_POKEMON_BYTES];
+} home_pokemon_t;
 typedef struct {
     home_weather_t weather;
     home_feed_t feed;
     home_air_t air;
+    home_pokemon_t pokemon;
 } home_data_t;
 
 /* Counters kept across restarts, written at most once every few minutes. */
