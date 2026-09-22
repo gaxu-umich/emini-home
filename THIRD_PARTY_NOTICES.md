@@ -60,9 +60,11 @@ the licence in `licenses/esp-idf/wpa_supplicant/README`: Copyright (c)
 ## Information services
 
 - **Weather** comes from the [MET Norway](https://api.met.no/) Locationforecast
-  API. Data is licensed under CC BY 4.0; the weather screen credits MET Norway.
+  API. Data is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
+  attribution is retained here and in the phone panel. Daily ranges and icons
+  are derived from the forecast data.
 - **News** comes from the RSS or Atom feed you choose. The default is
-  [BBC World](https://feeds.bbci.co.uk/news/world/rss.xml). Headlines belong to
+  [BBC World](https://feeds.bbci.co.uk/news/world/rss.xml). Headlines and summaries belong to
   their publishers and are not covered by this project's licence.
 - **Place search** in the panel uses the
   [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api),
@@ -88,3 +90,9 @@ Pokémon names, artwork and game text belong to their respective rights holders;
 the repository's MIT license does not relicense that content. This project is
 not affiliated with or endorsed by Pokémon, Nintendo, Game Freak or Creatures.
 No Pokémon artwork is embedded in the firmware or committed as a test fixture.
+
+### Weather US AQI
+
+Weather displays US AQI supplied by the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api),
+licensed under CC BY 4.0. The device selects the current hourly value for the saved
+location; UV, pollen and PM2.5 series are not requested.

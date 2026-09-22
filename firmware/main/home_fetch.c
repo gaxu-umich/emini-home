@@ -985,7 +985,7 @@ esp_err_t home_fetch_weather(const home_config_t *c, home_weather_t *w, int64_t 
     }
     char error[97] = "Weather connection failed";
     home_weather_t candidate;
-    if (e == ESP_OK && !home_parse_weather(body, size, &candidate, now, error))
+    if (e == ESP_OK && !home_parse_weather_zone(body, size, &candidate, now, c->timezone, error))
         e = ESP_FAIL;
     free(body);
     if (e == ESP_OK) {
@@ -1041,9 +1041,9 @@ esp_err_t home_fetch_feed(const home_config_t *c, home_feed_t *f, int64_t now)
     return e;
 }
 
-/* Air quality, UV and pollen. The host is locked: a redirect must not be able to
+/* Weather US AQI. The host is locked: a redirect must not be able to
  * carry the coordinates anywhere but Open-Meteo. The body is bounded by the same
- * 128 KiB wire limit as every other source and the parser keeps 24 hours of it. */
+ * 128 KiB wire limit as every other source; only the current AQI is cached. */
 esp_err_t home_fetch_air(const home_config_t *c, home_air_t *a, int64_t now)
 {
     if (!c->location_ready || now < 1704067200 || now < a->meta.next_fetch)
@@ -1053,8 +1053,7 @@ esp_err_t home_fetch_air(const home_config_t *c, home_air_t *a, int64_t now)
            lon = round(c->longitude * 10000.0) / 10000.0;
     int length = snprintf(url, sizeof(url),
                           "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.4f&"
-                          "longitude=%.4f&hourly=pm2_5,pm10,european_aqi,us_aqi,uv_index,"
-                          "alder_pollen,birch_pollen,grass_pollen,mugwort_pollen&forecast_days=2&"
+                          "longitude=%.4f&hourly=us_aqi&forecast_days=1&"
                           "timezone=UTC",
                           lat, lon);
     if (length < 0 || length >= (int)sizeof(url))

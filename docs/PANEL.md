@@ -60,21 +60,18 @@ to open a new one.
 
 The **On your Home** section shows the last picture the display confirmed, pixel
 for pixel, with its status and the battery. Below it, **Your screens** lists the
-six kinds of information:
+five kinds of information:
 
 | Screen | What it shows |
 | --- | --- |
-| Weather | The forecast from MET Norway for the place you set |
+| Weather | The forecast from MET Norway and US AQI from Open-Meteo for the place you set |
 | News | One headline from a public RSS or Atom feed: the first item for BBC World (the default), the newest entry for other HTTPS feeds |
 | Your note | A few words of your own |
 | Sky | Sunrise, sunset and the moon, worked out on the device from the place you set; nothing is downloaded |
-| Air | Air quality, UV and pollen from Open-Meteo for the place you set |
 | Pokémon | One of the original 151 each day, with a sprite and English Pokédex introduction |
 
-Sky and Air are new, and they start switched off: your display keeps showing
-what it showed before. Air's picture arrives with the next update, so until then
-that screen says so when you switch it on. Turn one on, or off, under **In your
-collection** on its page.
+Sky and Pokémon start switched off. Turn a screen on or off under **In your
+collection** on its page. Legacy Air settings are migrated to Weather.
 
 Tap a screen to open its page:
 
@@ -87,8 +84,8 @@ Tap a screen to open its page:
   the source's cache time has run out.
 - **What it says**: for Weather, the place (see below). For News, the feed
   address. For your note, the words.
-- **How it looks**: the **Composition** and a link to the texture, colour and
-  text size.
+- **How it looks**: the **Composition** (except Weather, which has a fixed
+  daily layout) and a link to the texture, colour and text size.
 - **In your collection**: include the screen in the rotation and change its
   order.
 
@@ -123,16 +120,13 @@ network does not.
 
 <p align="center"><img src="images/panel-sky.webp" width="260" alt="The Sky screen page in the panel: a preview and the note that everything is computed on the device"></p>
 
-### The Air screen
+### Weather air quality
 
-Air shows the European air quality index, PM2.5 for the next 24 hours, the UV
-index with a sunscreen hint and, in Europe, four pollens, from Open-Meteo's
-Air Quality service. On its page you choose the headline number: the European
-index, the US AQI or PM2.5. Home asks Open-Meteo only while this screen is
-switched on, about once an hour, and sends it the saved coordinates and
-nothing else.
-
-<p align="center"><img src="images/panel-air.webp" width="260" alt="The Air screen page in the panel: the Open-Meteo source line and the choice of the headline number"></p>
+US AQI appears below today's high/low temperatures in the same font size.
+It is black through 50, yellow from 51 to 100, and red above 100; unavailable
+values show a dash. Home requests only US AQI from Open-Meteo's Air Quality
+service while Weather is enabled, using the saved coordinates. Refreshing
+Weather refreshes both weather and AQI. There is no separate Air screen.
 
 ### Pokémon of the day
 
@@ -150,7 +144,9 @@ Turning the screen off stops subsequent downloads. See [Pokémon implementation]
 
 ### Compositions
 
-Every screen can be drawn as **Print**, **Rhythm** or **Atlas**. Choose
+Weather uses one fixed layout: today above the next seven days. Its saved
+composition setting is ignored, and it does not cycle compositions. Other
+screens can be drawn as **Print**, **Rhythm** or **Atlas**. Choose
 **In turn** to use all three: Home shows Print, then Rhythm, then Atlas, and
 moves to the next composition each time that screen comes back to the display.
 When the same screen stays on the display, the composition changes after each
@@ -158,7 +154,7 @@ interval, but not during quiet hours. Set it right under the composition
 choices: **Change composition every … minutes** (5 to 1440), separate from the
 Rhythm tab.
 
-<p align="center"><img src="images/panel-composition-cycle.webp" width="260" alt="How it looks on the Weather page: Composition set to In turn, a note that Print, Rhythm and Atlas take turns, and Change composition every … minutes set to 30"></p>
+Weather no longer offers the composition selector shown in older screenshots.
 
 ## 4. The Rhythm tab
 

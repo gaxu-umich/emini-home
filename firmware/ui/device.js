@@ -95,7 +95,6 @@
       feed: "News",
       note: "Your note",
       sky: "Sky",
-      air: "Air",
       pokemon: "Pokémon",
       pokemonDesc: "A daily sprite and Pokédex introduction",
       pokemonSource:
@@ -104,12 +103,8 @@
       feedDesc: "News from around the world",
       noteDesc: "A few words of your own",
       skyDesc: "Sun and moon over your place",
-      airDesc: "Air quality, UV and pollen",
       skySource:
         "Worked out on the device from the place you saved; nothing is downloaded.",
-      airSource:
-        "Air quality, UV and pollen come from Open-Meteo, licensed under CC BY 4.0.",
-      airMain: "The big number",
       brush: "Brush",
       brushChoice: "Tone structure",
       brushGrain: "Grain",
@@ -117,9 +112,6 @@
       brushGrid: "Grid (classic)",
       brushHelp:
         "Four pigments and no grey: every tone is a pattern. Pick the one that paints it: soft grain, printed dots, or the ordered grid of earlier versions.",
-      airEU: "European air quality index",
-      airUS: "US AQI",
-      airPM: "PM2.5 in micrograms per cubic metre",
       edit: "Edit",
       enabled: "Include this screen",
       off: "Not in rotation",
@@ -374,7 +366,6 @@
       feed: "Wiadomości",
       note: "Twoja kartka",
       sky: "Niebo",
-      air: "Powietrze",
       pokemon: "Pokémon",
       pokemonDesc: "Codzienny obrazek i opis z Pokédexu",
       pokemonSource:
@@ -383,12 +374,8 @@
       feedDesc: "Wiadomości ze świata",
       noteDesc: "Kilka własnych słów",
       skyDesc: "Słońce i księżyc nad Twoim miejscem",
-      airDesc: "Jakość powietrza, UV i pyłki",
       skySource:
         "Liczone na urządzeniu z zapisanej lokalizacji; nic nie jest pobierane.",
-      airSource:
-        "Jakość powietrza, UV i pyłki pochodzą z Open-Meteo, na licencji CC BY 4.0.",
-      airMain: "Duża liczba",
       brush: "Pędzel",
       brushChoice: "Struktura tonów",
       brushGrain: "Ziarno",
@@ -396,9 +383,6 @@
       brushGrid: "Siatka (klasyczna)",
       brushHelp:
         "Cztery pigmenty i żadnej szarości: każdy ton to wzór. Wybierz ten, który go maluje: miękkie ziarno, kropkę jak w druku albo klasyczną siatkę z wcześniejszych wersji.",
-      airEU: "Europejski indeks jakości powietrza",
-      airUS: "Indeks US AQI",
-      airPM: "PM2,5 w mikrogramach na metr sześcienny",
       edit: "Edytuj",
       enabled: "Uwzględnij ten ekran",
       off: "Poza rotacją",
@@ -663,7 +647,6 @@
     sky: '<path d="M3 17a9 9 0 0 1 18 0"/><path d="M1 17h2m18 0h2M12 4v2M5.6 7.6 7 9m10.4-1.4L16 9"/><circle cx="12" cy="17" r="3"/>',
     pokemon:
       '<circle cx="12" cy="12" r="9"/><path d="M3 12h6m6 0h6"/><circle cx="12" cy="12" r="3"/>',
-    air: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/>',
     palette:
       '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/>',
     globe:
@@ -963,6 +946,8 @@
     if (!url) return;
     holder.querySelector("[data-story-title]").textContent =
       typeof item.title === "string" ? item.title : "";
+    holder.querySelector("[data-story-summary]").textContent =
+      typeof item.summary === "string" ? item.summary : "";
     const source = typeof item.source === "string" ? item.source : "";
     const published =
       Number.isFinite(item.published_at) && item.published_at > 0
@@ -1015,7 +1000,7 @@
       position = S.draft.order.indexOf(s),
       last =
         S.draft.enabled.filter(Boolean).length === 1 && S.draft.enabled[index];
-    return `<section class="editor-page">${backButton()}<div class="page-title"><span class="title-icon">${icon(s)}</span><div><h1>${t(s)}</h1><p>${t(s + "Desc")}</p></div></div><div class="editor-layout"><section class="editor-fields"><div class="form-section"><h2>${say("What it says", "Co pokazuje")}</h2>${s === "feed" ? `<section id="selected-story" class="source-state" hidden><strong data-story-title></strong><p class="hint" data-story-source></p><a class="button-link" data-story-link target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${say("Read full story ↗", "Przeczytaj wiadomość ↗")}</a></section>` : ""}<div class="fields">${
+    return `<section class="editor-page">${backButton()}<div class="page-title"><span class="title-icon">${icon(s)}</span><div><h1>${t(s)}</h1><p>${t(s + "Desc")}</p></div></div><div class="editor-layout"><section class="editor-fields"><div class="form-section"><h2>${say("What it says", "Co pokazuje")}</h2>${s === "feed" ? `<section id="selected-story" class="source-state" hidden><strong data-story-title></strong><p data-story-summary></p><p class="hint" data-story-source></p><a class="button-link" data-story-link target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${say("Read full story ↗", "Przeczytaj wiadomość ↗")}</a></section>` : ""}<div class="fields">${
       s === "weather"
         ? weatherEditor()
         : s === "feed"
@@ -1030,18 +1015,8 @@
             ? `<p class="hint">${t("pokemonSource")}</p>`
             : s === "sky"
               ? `<p class="hint">${t("skySource")}</p>`
-              : s === "air"
-                ? `<p class="hint">${t("airSource")}</p>${select(
-                    "air_main",
-                    "airMain",
-                    [
-                      ["eu", t("airEU")],
-                      ["us", t("airUS")],
-                      ["pm25", t("airPM")],
-                    ],
-                  )}`
-                : `<label class="field"><span>${t("noteText")}</span><textarea data-path="note" maxlength="240" rows="5" placeholder="${say("What matters today?", "Co jest dziś ważne?")}">${esc(S.draft.note)}</textarea><small>${t("noteHelp")}<span id="note-count">${noteSpace(S.draft.note)}</span><progress id="note-meter" max="100" value="${Math.min(100, C.noteUsage(S.draft.note).percent)}" aria-label="${esc(noteSpace(S.draft.note))}"></progress></small></label>`
-    }</div></div><div class="form-section"><h2>${say("How it looks", "Jak wygląda")}</h2><div class="fields">${select(
+              : `<label class="field"><span>${t("noteText")}</span><textarea data-path="note" maxlength="240" rows="5" placeholder="${say("What matters today?", "Co jest dziś ważne?")}">${esc(S.draft.note)}</textarea><small>${t("noteHelp")}<span id="note-count">${noteSpace(S.draft.note)}</span><progress id="note-meter" max="100" value="${Math.min(100, C.noteUsage(S.draft.note).percent)}" aria-label="${esc(noteSpace(S.draft.note))}"></progress></small></label>`
+    }</div></div><div class="form-section"><h2>${say("How it looks", "Jak wygląda")}</h2><div class="fields">${s === "weather" ? `<p class="hint">${say("Today and the next seven days, in one view.", "Dzisiaj i kolejne siedem dni w jednym widoku.")}</p>` : select(
       "styles." + s,
       "layout",
       [
@@ -1050,7 +1025,7 @@
         ["atlas", t("atlas")],
         ["cycle", t("cycleStyle")],
       ],
-    )}${styleHints(s)}<button class="setting-link" data-action="appearance-settings">${icon("palette")}<span>${say("Texture, colour and larger text", "Faktura, kolor i większy tekst")}</span>${icon("arrow")}</button></div></div><div class="form-section"><h2>${say("In your collection", "W Twojej kolekcji")}</h2><label class="check"><span>${t("enabled")}</span><input type="checkbox" data-path="enabled.${index}" ${S.draft.enabled[index] ? "checked" : ""} ${last ? "disabled" : ""}></label>${last ? `<p class="hint">${say("Keep at least one screen enabled.", "Co najmniej jeden ekran musi pozostać aktywny.")}</p>` : ""}<div class="order-control"><button data-action="move" data-direction="-1" ${position === 0 ? "disabled" : ""}>↑ ${t("earlier")}</button><span>${position + 1} / ${C.screens.length}</span><button data-action="move" data-direction="1" ${position === C.screens.length - 1 ? "disabled" : ""}>↓ ${t("later")}</button></div></div></section><aside class="editor-aside"><section class="edit-preview"><div class="preview-title"><h2 id="preview-heading">${t("savedPreview")}</h2><button class="icon-label-button" data-action="native-preview" data-kind="draft">${icon("screens")}<span>1:1</span></button></div><canvas data-screen="${s}" width="400" height="300" role="img" aria-label="${esc(t("savedPreview"))}" ${!S.frames[s] ? "hidden" : ""}></canvas><p class="hint" id="preview-missing" ${S.frames[s] ? "hidden" : ""}>${t("previewMissing")}</p><p class="hint" id="draft-preview" ${!S.dirty ? "hidden" : ""}>${t("draftPreview")}</p><p class="hint">${t("photoHint")}</p></section><div id="source-holder">${sourceBlock(s)}</div></aside></div></section>`;
+    )}${s === "weather" ? "" : styleHints(s)}<button class="setting-link" data-action="appearance-settings">${icon("palette")}<span>${say("Texture, colour and larger text", "Faktura, kolor i większy tekst")}</span>${icon("arrow")}</button></div></div><div class="form-section"><h2>${say("In your collection", "W Twojej kolekcji")}</h2><label class="check"><span>${t("enabled")}</span><input type="checkbox" data-path="enabled.${index}" ${S.draft.enabled[index] ? "checked" : ""} ${last ? "disabled" : ""}></label>${last ? `<p class="hint">${say("Keep at least one screen enabled.", "Co najmniej jeden ekran musi pozostać aktywny.")}</p>` : ""}<div class="order-control"><button data-action="move" data-direction="-1" ${position === 0 ? "disabled" : ""}>↑ ${t("earlier")}</button><span>${position + 1} / ${C.screens.length}</span><button data-action="move" data-direction="1" ${position === C.screens.length - 1 ? "disabled" : ""}>↓ ${t("later")}</button></div></div></section><aside class="editor-aside"><section class="edit-preview"><div class="preview-title"><h2 id="preview-heading">${t("savedPreview")}</h2><button class="icon-label-button" data-action="native-preview" data-kind="draft">${icon("screens")}<span>1:1</span></button></div><canvas data-screen="${s}" width="400" height="300" role="img" aria-label="${esc(t("savedPreview"))}" ${!S.frames[s] ? "hidden" : ""}></canvas><p class="hint" id="preview-missing" ${S.frames[s] ? "hidden" : ""}>${t("previewMissing")}</p><p class="hint" id="draft-preview" ${!S.dirty ? "hidden" : ""}>${t("draftPreview")}</p><p class="hint">${t("photoHint")}</p></section><div id="source-holder">${sourceBlock(s)}</div></aside></div></section>`;
   }
   function settingsMenu() {
     const rows = [
@@ -2008,14 +1983,6 @@
         d.latitude === c.latitude &&
         d.longitude === c.longitude
       );
-    if (screen === "air")
-      return (
-        c.location_ready !== false &&
-        d.location_ready !== false &&
-        d.latitude === c.latitude &&
-        d.longitude === c.longitude &&
-        sources?.air?.valid === true
-      );
     return typeof d.note === "string" && d.note.trim() !== "";
   }
   function styleHints(screen) {
@@ -2237,7 +2204,7 @@
   }
   function sourceBlock(s) {
     /* Note is typed here and Sky is computed on the device: neither has anything
-       to fetch. Air does, so it gets the block and names its provider. */
+       to fetch. Downloaded sources get a status block. */
     if (s === "note" || s === "sky") return "";
     const v = S.status?.sources?.[s] || {};
     const name = [
@@ -2262,7 +2229,7 @@
       .map(([l, k]) => `<dt>${t(l)}</dt><dd>${esc(formatTime(v[k]))}</dd>`)
       .join(
         "",
-      )}</dl><p class="hint">${S.lang === "pl" ? "Godziny według:" : "Times shown in:"} ${esc(C.formatTimestamp(1, S.lang, S.config?.timezone || "UTC", S.config?.clock24 !== false)?.zone || "UTC")}</p>${v.error ? `<p class="error-text">${t("failed")}</p>` : ""}${s === "air" ? `<p class="hint">${t("airSource")}</p>` : ""}${s === "pokemon" ? `<p class="hint">${t("pokemonSource")}</p>` : `<button data-action="refresh" data-source="${s}">${t("refreshSource")}</button>`}</div></details>`;
+      )}</dl><p class="hint">${S.lang === "pl" ? "Godziny według:" : "Times shown in:"} ${esc(C.formatTimestamp(1, S.lang, S.config?.timezone || "UTC", S.config?.clock24 !== false)?.zone || "UTC")}</p>${v.error ? `<p class="error-text">${t("failed")}</p>` : ""}${s === "pokemon" ? `<p class="hint">${t("pokemonSource")}</p>` : `<button data-action="refresh" data-source="${s}">${t("refreshSource")}</button>`}</div></details>`;
   }
   function screenView() {
     return S.editorOpen ? editor() : overview();
@@ -2579,7 +2546,6 @@
                       pause_min: t("pauseMinutes"),
                       cycle_min: t("cycleInterval"),
                       ok_action: t("okAction"),
-                      air_main: t("airMain"),
                       clock24: t("clock"),
                       weekdays: t("days"),
                     })[k] || t(k),

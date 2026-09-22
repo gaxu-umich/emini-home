@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *screens[] = {"weather", "feed", "note", "sky", "air", "pokemon"};
+static const char *screens[] = {"weather", "feed", "note", "sky", "pokemon"};
+/* Only used when reading pre-removal settings and recipes. */
+static const char *legacy_screens[] = {"weather", "feed", "note", "sky", "air", "pokemon"};
 static const char *styles[] = {"print", "rhythm", "atlas", "cycle"};
 static const char *modes[] = {"fixed", "day", "rotate"};
 const char *home_screen_name(int n)
@@ -94,7 +96,6 @@ void home_config_defaults(home_config_t *c)
     c->pause_min = 15;
     c->cycle_min = 30;
     c->ok_action = 0;
-    c->air_main = 0;
     c->brush = 0;
     c->quiet_enabled = true;
     c->quiet_start = 1350;
@@ -179,8 +180,6 @@ static bool boolean(const cJSON *j, const char *k, bool *out)
  * the "emini" card; the language moved to the phone panel alone, and a record that still asks for
  * the old language action is read as the card (D-HOME-CC-27). */
 static const char *const ok_actions[] = {"info", "refresh", "hold", "setup"};
-/* Air: which number is drawn large (index = home_config_t.air_main). */
-static const char *const air_mains[] = {"eu", "us", "pm25"};
 /* Brush (D-HOME-CC-23/25): tone structure of the large fields (index = home_config_t.brush).
  * The line-based screens of the 0.5.0 pre-releases are still accepted and read as grain, so a
  * record written by one of those builds still loads. */
@@ -286,37 +285,48 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
     cJSON *a = get(j, "enabled"), *o = get(j, "order");
     bool any = false;
     unsigned seen = 0;
-    /* Settings and recipes written before 0.5.0 list the first three screens. */
     int listed = cJSON_IsArray(a) ? cJSON_GetArraySize(a) : 0;
+    bool legacy_air = false;
+    for (const cJSON *v = cJSON_IsArray(o) ? o->child : NULL; v; v = v->next)
+        if (cJSON_IsString(v) && !strcmp(v->valuestring, "air"))
+            legacy_air = true;
     REQUIRE(cJSON_IsArray(a) && cJSON_IsArray(o) &&
-                (listed == 3 || listed == 5 || listed == HOME_SCREEN_COUNT) &&
-                cJSON_GetArraySize(o) == listed,
-            "Expected three, five or six screens");
+                (listed == 3 || listed == 4 || listed == 5 || (legacy_air && listed == 6)) &&
+                (!legacy_air || listed >= 5) && cJSON_GetArraySize(o) == listed,
+            "Invalid screen list");
+    memset(c.enabled, 0, sizeof(c.enabled));
+    int at = 0;
     for (int i = 0; i < listed; i++) {
         cJSON *v = cJSON_GetArrayItem(a, i);
         REQUIRE(cJSON_IsBool(v), "Invalid enabled screens");
-        c.enabled[i] = cJSON_IsTrue(v);
-        any |= c.enabled[i];
+        int target = legacy_air ? (i == 4 ? -1 : i == 5 ? HOME_POKEMON : i) : i;
+        if (target >= 0) {
+            c.enabled[target] = cJSON_IsTrue(v);
+            any |= c.enabled[target];
+        }
         v = cJSON_GetArrayItem(o, i);
-        n = cJSON_IsString(v) ? home_screen_index(v->valuestring) : -1;
-        REQUIRE(n >= 0 && n < listed && !(seen & (1U << n)), "Invalid screen order");
+        n = -1;
+        for (int k = 0; cJSON_IsString(v) && k < listed; k++)
+            if (!strcmp(v->valuestring, legacy_air ? legacy_screens[k] : screens[k]))
+                n = k;
+        REQUIRE(n >= 0 && !(seen & (1U << n)), "Invalid screen order");
         seen |= 1U << n;
-        c.order[i] = n;
+        if (!legacy_air || n != 4)
+            c.order[at++] = legacy_air && n == 5 ? HOME_POKEMON : n;
     }
-    /* A screen the record does not mention stays off and goes last in the
-     * order, which keeps order[] a permutation of all screens. */
-    for (int i = listed, at = listed; i < HOME_SCREEN_COUNT; i++) {
-        c.enabled[i] = false;
-        for (int n2 = 0; n2 < HOME_SCREEN_COUNT; n2++)
-            if (!(seen & (1U << n2))) {
-                seen |= 1U << n2;
-                c.order[at++] = n2;
-                break;
-            }
+    for (int i = 0; i < HOME_SCREEN_COUNT; i++) {
+        bool present = false;
+        for (int k = 0; k < at; k++)
+            present |= c.order[k] == i;
+        if (!present)
+            c.order[at++] = i;
     }
+    /* An Air-only setup becomes Weather instead of losing all settings. */
+    if (!any && legacy_air && cJSON_IsTrue(cJSON_GetArrayItem(a, 4)))
+        any = c.enabled[HOME_WEATHER] = true;
     REQUIRE(any, "Enable at least one screen");
     cJSON *st = get(j, "styles");
-    REQUIRE(known(st, screens, HOME_SCREEN_COUNT), "Invalid styles");
+    REQUIRE(known(st, legacy_screens, 6), "Invalid styles");
     for (int i = 0; i < HOME_SCREEN_COUNT; i++) {
         /* Additional screens are optional in older records. */
         if (i > HOME_NOTE && !get(st, screens[i]))
@@ -335,7 +345,8 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
     n = choice(j, "mode", modes, 3);
     REQUIRE(n >= 0, "Invalid mode");
     c.mode = n;
-    n = choice(j, "fixed_screen", screens, HOME_SCREEN_COUNT);
+    n = choice(j, "fixed_screen", legacy_screens, 6);
+    n = n == 4 ? HOME_WEATHER : n == 5 ? HOME_POKEMON : n;
     REQUIRE(n >= 0, "Invalid fixed screen");
     c.fixed_screen = n;
     REQUIRE(integer(j, "interval_min", 5, 1440, &n), "Rotation minimum is five minutes");
@@ -356,11 +367,6 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
         }
         REQUIRE(n >= 0, "Invalid OK button action");
         c.ok_action = (uint8_t)n;
-    }
-    if (get(j, "air_main")) { /* optional since 0.5.0 */
-        n = choice(j, "air_main", air_mains, 3);
-        REQUIRE(n >= 0, "Invalid Air headline number");
-        c.air_main = (uint8_t)n;
     }
     if (get(j, "brush")) { /* optional since 0.5.0 */
         n = choice(j, "brush", brushes, 3);
@@ -385,7 +391,8 @@ bool home_config_decode(const char *text, size_t len, home_config_t *out, const 
     for (int i = 0; i < HOME_DAY_SLOTS; i++) {
         cJSON *v = cJSON_GetArrayItem(d, i);
         REQUIRE(known(v, dkeys, 2) && hm(v, "time", &c.day_minute[i]), "Invalid day slot");
-        n = choice(v, "screen", screens, HOME_SCREEN_COUNT);
+        n = choice(v, "screen", legacy_screens, 6);
+        n = n == 4 ? HOME_WEATHER : n == 5 ? HOME_POKEMON : n;
         REQUIRE(n >= 0, "Invalid day screen");
         c.day_screen[i] = n;
         if (i)
@@ -470,7 +477,6 @@ cJSON *home_config_json(const home_config_t *c, bool recipe)
     JSON_NEED(cJSON_AddNumberToObject(j, "cycle_min", c->cycle_min));
     JSON_NEED(
         cJSON_AddStringToObject(j, "ok_action", ok_actions[c->ok_action < 4 ? c->ok_action : 0]));
-    JSON_NEED(cJSON_AddStringToObject(j, "air_main", air_mains[c->air_main < 3 ? c->air_main : 0]));
     JSON_NEED(cJSON_AddStringToObject(j, "brush", brushes[c->brush < 3 ? c->brush : 0]));
     JSON_NEED(cJSON_AddNumberToObject(j, "weekdays", c->weekdays));
     cJSON *q = cJSON_AddObjectToObject(j, "quiet");
@@ -558,10 +564,8 @@ int home_auto_screen(const home_config_t *c, const home_data_t *d, const struct 
     ready.enabled[HOME_WEATHER] &= c->location_ready && d->weather.meta.valid;
     ready.enabled[HOME_FEED] &= d->feed.meta.valid;
     ready.enabled[HOME_NOTE] &= c->note[0] != 0;
-    /* Sky is computed on the device from the saved place; Air needs both the
-     * place and a downloaded reading, like the weather. */
+    /* Sky is computed on the device from the saved place. */
     ready.enabled[HOME_SKY] &= c->location_ready;
-    ready.enabled[HOME_AIR] &= c->location_ready && d->air.meta.valid;
     ready.enabled[HOME_POKEMON] &= d->pokemon.meta.valid;
     bool ready_any = false;
     for (int i = 0; i < HOME_SCREEN_COUNT; i++)

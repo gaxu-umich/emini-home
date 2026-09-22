@@ -4,6 +4,7 @@
 #include "home_types.h"
 #include "home_places.h"
 #include "home_air.h"
+#include "home_parse.h"
 #include "home_qr.h"
 #include "home_sky.h"
 #include "generated/home_font.h"
@@ -15,7 +16,7 @@
 
 enum { BLACK = 0, PAPER = 1, YELLOW = 2, RED = 3, W = 400, H = 300 };
 #ifndef HOME_VERSION_TEXT
-#define HOME_VERSION_TEXT "0.5.4-pokemon-outline"
+#define HOME_VERSION_TEXT "0.5.5-weather-news"
 #endif
 /* Brushes (D-HOME-CC-23, narrowed by D-HOME-CC-25): the user picks the tone structure in the
  * panel. The line-based screens (engraving, cross-hatch) were dropped after the device test:
@@ -88,12 +89,10 @@ static const phrase_t chinese[] = {
     {"A little room for the world.", "留一点空间给世界。"},
     {"A sky for your place.", "你所在地的天空。"},
     {"AIR", "空气"},
-    {"AIR QUALITY", "空气质量"},
     {"AWAKE", "运行"},
     {"About %d days", "约 %d 天"},
     {"About %d h", "约 %d 小时"},
     {"Age unknown · check time", "时间未知 · 请检查时钟"},
-    {"Air", "空气"},
     {"BATTERY", "电池"},
     {"BATTERY · LAST SEVEN DAYS", "电池 · 最近七天"},
     {"Cannot load data · check the phone panel", "无法获取数据 · 请查看手机面板"},
@@ -135,26 +134,20 @@ static const phrase_t chinese[] = {
     {"Midnight sun", "极昼"},
     {"Mostly clear", "大致晴朗"},
     {"NETWORK PASSWORD", "网络密码"},
-    {"NEXT 24 H · PM2.5, UV IN YELLOW", "未来 24 小时 · PM2.5，紫外线为黄色"},
     {"NEXT HOURS · °%s / mm", "未来几小时 · °%s / 毫米"},
     {"NOW", "现在"},
     {"New in %d days", "%d 天后新月"},
     {"New moon", "新月"},
     {"New today", "今天新月"},
-    {"No index", "无指数"},
-    {"No pollen forecast for this place", "此地无花粉预报"},
     {"No range", "无高低温"},
     {"ONE STORY", "一条消息"},
     {"Older data · waiting for update", "数据较旧 · 等待更新"},
     {"Open the panel on your phone and choose what Home shows.", "打开手机面板，选择 Home 显示的内容。"},
-    {"Open the phone panel and use your location. Air quality, UV and pollen from Open-Meteo will appear here within the hour.",
-     "打开手机面板并使用你的位置。来自 Open-Meteo 的空气质量、紫外线和花粉会在一小时内出现。"},
     {"Open the phone panel and use your location. The first forecast will appear here.",
      "打开手机面板并使用你的位置。第一份预报会出现在这里。"},
     {"Open the phone panel and use your location. The sun and the moon are then worked out here, with nothing downloaded.",
      "打开手机面板并使用你的位置。日月将在设备上算出，不下载任何数据。"},
     {"PICTURES DRAWN", "已绘制画面"},
-    {"PM2.5 in µg per m3", "PM2.5 微克每立方米"},
     {"Partly cloudy", "局部多云"},
     {"Password", "密码"},
     {"Polar night", "极夜"},
@@ -168,10 +161,8 @@ static const phrase_t chinese[] = {
     {"Sunrise and sunset unknown", "日出日落未知"},
     {"Sunset", "日落"},
     {"TODAY", "今天"},
-    {"The air, at a glance.", "一眼看懂空气。"},
     {"The sun does not rise today", "今天太阳不升"},
     {"The sun does not set today", "今天太阳不落"},
-    {"This screen arrives with the next update.", "这个画面会在下次更新时出现。"},
     {"Thunderstorms", "雷雨"},
     {"Waning crescent", "残月"},
     {"Waning gibbous", "亏凸月"},
@@ -191,7 +182,6 @@ static const phrase_t chinese[] = {
     {"day %d h %02d min (%s%s min)", "昼长 %d 小时 %02d 分（%s%s 分）"},
     {"daylight all day", "全天有光"},
     {"no daylight today", "今天没有日光"},
-    {"sunscreen now", "现在涂防晒"},
 };
 /* Checked by the harness: every English phrase above is one the screens really pass to
  * tr(), and every Chinese character is in the font the device carries (GB 2312). */
@@ -217,12 +207,6 @@ static const char *tr(int lang, const char *en, const char *pol)
         return zh ? zh : en;
     }
     return lang == LANG_PL ? pol : en;
-}
-/* One of three word lists, for the arrays that name months, levels and phases. */
-static const char *const *words(int lang, const char *const *en, const char *const *pol,
-                                const char *const *zh)
-{
-    return lang == LANG_ZH ? zh : lang == LANG_PL ? pol : en;
 }
 static void pixel(canvas_t *c, int x, int y, int p)
 {
@@ -638,6 +622,27 @@ static void source_footer(canvas_t *c, const home_config_t *cfg, const home_sour
                      tr(lang, "Checked %lld days ago", "Sprawdzono %lld dni temu"),
                      (long long)(hours / 24));
     }
+    if (!source[0]) {
+        char checked[64];
+        stamp(checked, sizeof checked, time_valid(m->checked_at) ? m->checked_at : m->fetched_at,
+              lang, cfg->clock24, cfg->timezone);
+        char *clock = strstr(checked, " · ");
+        if (st == HOME_READY)
+            snprintf(status, sizeof status, "%s %s", tr(lang, "Checked", "Sprawdzono"),
+                     clock ? clock + strlen(" · ") : "—");
+        else
+            snprintf(status, sizeof status, "%s",
+                     st == HOME_ERROR ? tr(lang, "Update failed", "Błąd aktualizacji")
+                                      : tr(lang, "Waiting for update", "Czeka na aktualizację"));
+        char *separator = strstr(date, " · ");
+        if (separator)
+            *separator = 0;
+        int date_width = width(0, date, sizeof date);
+        rect(c, 14, 268, 372, 1, BLACK);
+        txt(c, 14, 277, 360 - date_width, 18, 0, status);
+        txt(c, 386 - date_width, 277, date_width, 18, 0, date);
+        return;
+    }
     rect(c, 14, 261, 372, 1, BLACK);
     txt(c, 14, 265, 215, 17, 0, source);
     txt(c, 231, 265, 155, 17, 0, date);
@@ -647,15 +652,12 @@ static void empty(canvas_t *c, const home_config_t *cfg, home_screen_t screen,
                   home_source_state_t st)
 {
     int lang = lang_of(cfg);
-    const char *title = screen == HOME_WEATHER
-                            ? tr(lang, "A forecast for your place.", "Prognoza dla Twojego miejsca.")
-                        : screen == HOME_FEED
-                            ? tr(lang, "A little room for the world.", "Trochę miejsca na świat.")
-                        : screen == HOME_AIR
-                            ? tr(lang, "The air, at a glance.", "Powietrze na jeden rzut oka.")
-                        : screen == HOME_SKY
-                            ? tr(lang, "A sky for your place.", "Niebo dla Twojego miejsca.")
-                            : tr(lang, "Make this space yours.", "To miejsce jest dla Ciebie.");
+    const char *title =
+        screen == HOME_WEATHER
+            ? tr(lang, "A forecast for your place.", "Prognoza dla Twojego miejsca.")
+        : screen == HOME_FEED ? tr(lang, "A little room for the world.", "Trochę miejsca na świat.")
+        : screen == HOME_SKY  ? tr(lang, "A sky for your place.", "Niebo dla Twojego miejsca.")
+                              : tr(lang, "Make this space yours.", "To miejsce jest dla Ciebie.");
     /* Sunset ramp paper -> yellow -> red (three pigments per point), in the user's brush. */
     c->raster = c->brush;
     for (int x = 280; x < 400; ++x) {
@@ -686,11 +688,6 @@ static void empty(canvas_t *c, const home_config_t *cfg, home_screen_t screen,
                                     "moon are then worked out here, with nothing downloaded.",
                                     "Otwórz panel w telefonie i użyj swojej lokalizacji. Słońce i "
                                     "księżyc policzą się tutaj, bez pobierania.")
-        : screen == HOME_AIR   ? tr(lang,
-                                    "Open the phone panel and use your location. Air quality, UV "
-                                    "and pollen from Open-Meteo will appear here within the hour.",
-                                    "Otwórz panel w telefonie i użyj swojej lokalizacji. Jakość "
-                                    "powietrza, UV i pyłki z Open-Meteo pojawią się tu w ciągu godziny.")
                                : tr(lang,
                                     "Write a message in your phone panel. A reminder, a thought, "
                                     "something worth keeping in view.",
@@ -725,22 +722,6 @@ static const char *condition(const home_weather_t *w, int lang)
         return tr(lang, "Cloud cover", "Zachmurzenie");
     return tr(lang, "Weather forecast", "Prognoza pogody");
 }
-/* Large text sets the condition in 30 px only when no word is wider than its box, so
- * text() never splits a word or cuts it with an ellipsis; otherwise it stays 22 px. */
-static int condition_font(const home_config_t *cfg, const char *s, int w)
-{
-    size_t n = strlen(s), at = 0;
-    int word = 0;
-    if (!cfg->large_text)
-        return 2;
-    while (at < n) {
-        uint32_t ch = next_cp(s, n, &at);
-        word = ch == ' ' ? 0 : word + glyph(3, ch)->advance;
-        if (word > w)
-            return 2;
-    }
-    return 3;
-}
 static double temp(double c, bool f)
 {
     return f ? c * 1.8 + 32 : c;
@@ -773,312 +754,186 @@ static void clock_text(char *out, size_t len, const struct tm *tm, bool clock24,
     else
         snprintf(out, len, "%d%s", hour, meridiem);
 }
-/* English names the precipitation after the current symbol, so the line never says
- * rain under "Snow or sleet"; Polish "Opady" covers every kind. Later hours have no
- * symbol of their own in the cache, so the current one stands in for them. */
-static const char *precipitation(const home_weather_t *w, int lang)
+/* Reference layout: today's conditions above seven local-date forecast columns.
+ * Drawn with this project's fonts and primitives; no external image assets. */
+static void weather_circle(canvas_t *c, int cx, int cy, int r, int color)
 {
-    return lang                                               ? "Opady"
-           : contains(w->symbol, sizeof w->symbol, "sleet") ? "Sleet"
-           : contains(w->symbol, sizeof w->symbol, "snow")  ? "Snow"
-                                                            : "Rain";
+    for (int y = -r; y <= r; y++)
+        for (int x = -r; x <= r; x++)
+            if (x * x + y * y <= r * r)
+                pixel(c, cx + x, cy + y, color);
 }
-/* When the first rain of the parsed hourly window starts and stops. hourly_rain[k]
- * covers the hour from forecast_at + k h. The window ends at the first hour without
- * a rain amount, so nothing is claimed past the window or past missing data. */
-static bool rain_outlook(char *out, size_t len, const home_config_t *cfg, const home_weather_t *w,
-                         int64_t now)
+static void weather_icon(canvas_t *c, const char *symbol, int cx, int cy, int r, bool hero)
 {
-    int lang = lang_of(cfg);
-    const char *noun = precipitation(w, lang);
-    int n = imin(w->hourly_count, 12), start = -1, stop = -1;
-    for (int k = 0; k < n; ++k)
-        if (!isfinite(w->hourly_rain[k]))
-            n = k;
-    /* Hours already over are skipped, so older data never names a time that has passed. */
-    int64_t ago = time_valid(now) && now > w->forecast_at ? now - w->forecast_at : 0;
-    int first = ago >= 12 * 3600 ? 12 : (int)(ago / 3600);
-    if (n - first < 2 || !time_valid(w->forecast_at))
-        return false;
-    for (int k = first; k < n; ++k) {
-        bool wet = w->hourly_rain[k] > 0.05; /* same threshold as rain_field() */
-        if (wet && start < 0)
-            start = k;
-        else if (!wet && start >= 0 && stop < 0)
-            stop = k;
-    }
-    struct tm from, until;
-    if (!home_tz_localtime(cfg->timezone, w->forecast_at + (int64_t)imax(start, first) * 3600,
-                           &from) ||
-        !home_tz_localtime(cfg->timezone, w->forecast_at + (int64_t)(stop < 0 ? n : stop) * 3600,
-                           &until))
-        return false;
-    char a[16], b[16];
-    clock_text(a, sizeof a, &from, cfg->clock24, false,
-               stop < 0 || (from.tm_hour < 12) != (until.tm_hour < 12));
-    clock_text(b, sizeof b, &until, cfg->clock24, true, true);
-    if (start < 0)
-        snprintf(out, len, tr(lang, "Dry until %s", "Bez opadów do %s"), b);
-    else if (start == first && stop < 0)
-        snprintf(out, len, tr(lang, "%s for %d h", "%s przez %d h"), noun, n - first);
-    else if (start == first)
-        snprintf(out, len, tr(lang, "%s until %s", "%s do %s"), noun, b);
-    else if (stop < 0)
-        snprintf(out, len, tr(lang, "%s from %s", "%s od %s"), noun, a);
-    else
-        snprintf(out, len, "%s %s–%s", noun, a, b);
-    return true;
-}
-/* Fallback: the precipitation amount of the current hour. */
-static void rain_amount(char *out, size_t len, const home_weather_t *w, int lang)
-{
-    char mm[24];
-    if (isfinite(w->precipitation)) {
-        number(mm, sizeof mm, clamp(w->precipitation, 0, 999), 1, lang);
-        snprintf(out, len, "%s %s mm", precipitation(w, lang), mm);
-    } else
-        snprintf(out, len, "%s —", precipitation(w, lang));
-}
-static void disc(canvas_t *c, int cx, int cy, int rx, int ry, const home_weather_t *w)
-{
-    float cloud = (float)clamp(w->cloud_cover / 100, 0, 1),
-          warm = (float)clamp((w->temperature + 15) / 55, 0, 1);
-    bool night = contains(w->symbol, sizeof w->symbol, "night");
-    float inv_rx = 1.0f / rx, inv_ry = 1.0f / ry;
-    /* Cloud edge and horizontal shade are constant down each column. */
-    for (int x = imax(0, cx - rx); x < imin(W, cx + rx + 1); ++x) {
-        float dx = (x - cx) * inv_rx;
-        float shade = clampf((dx + 1.0f) * 0.35f + warm * 0.3f, 0.04f, 0.96f);
-        float night_shade = 0.12f + 0.35f * (dx + 1.0f);
-        float edge = 0.54f - cloud * 1.05f + 0.10f * sinf((x - cx) / 15.0f);
-        float obscured_shade = cloud * 0.36f;
-        for (int y = imax(34, cy - ry); y < imin(255, cy + ry + 1); ++y) {
-            float dy = (y - cy) * inv_ry, r = dx * dx + dy * dy;
-            if (r > 1.0f)
-                continue;
-            int p =
-                night ? mix(c, x, y, PAPER, BLACK, night_shade) : mix(c, x, y, YELLOW, RED, shade);
-            if (dx < -0.35f && r > 0.36f && ((int)(sqrtf(r) * 40.0f) % 7) == 0)
-                p = night ? PAPER : YELLOW;
-            if (dy > edge)
-                p = mix(c, x, y, PAPER, BLACK, obscured_shade);
-            pixel(c, x, y, p);
-        }
-    }
-}
-static void rain_field(canvas_t *c, const home_weather_t *w, int y0, int y1)
-{
-    double rain = clamp(w->precipitation, 0, 20), wind = clamp(w->wind_speed, 0, 40);
-    int16_t wind_shift[H]; /* 600B, no heap; preserve exact integer rain positions. */
-    for (int y = y0; y < y1; ++y)
-        wind_shift[y] = (int16_t)(wind * y / 12);
-    int rain_rows = (int)clamp(rain * 1.8, 1, 7);
-    bool wet = rain > 0.05;
-    float wave_scale = 1.0f / (46.0f + (float)wind * 2.0f);
-    for (int x = 0; x < W; ++x) {
-        int horizon = y0 + 5 + (int)(4.0f * sinf(x * wave_scale));
-        float inv_depth = 1.0f / imax(1, y1 - horizon), warmth = (x / 399.0f) * 0.6f;
-        for (int y = y0; y < y1; ++y) {
-            if (y >= horizon) {
-                float d = (y - horizon) * inv_depth;
-                int p = mix(c, x, y, PAPER, YELLOW, d * 0.95f);
-                if (p == YELLOW)
-                    p = mix(c, x, y, YELLOW, RED, d * warmth);
-                pixel(c, x, y, p);
-            }
-            if (wet && (x + wind_shift[y]) % 13 == 0 && (y - y0) % 9 < rain_rows)
-                pixel(c, x, y, BLACK);
-        }
-    }
-}
-static bool graph_valid(const home_weather_t *w)
-{
-    int n = imin(w->hourly_count, 12);
-    if (n < 2)
-        return false;
-    for (int k = 0; k < n; ++k)
-        if (!isfinite(w->hourly_temperature[k]))
-            return false;
-    return true;
-}
-static void forecast_graph(canvas_t *c, const home_weather_t *w, int x, int y, int ww, int hh)
-{
-    int n = imin(w->hourly_count, 12);
-    if (!graph_valid(w))
+    if (!symbol[0]) {
+        txt(c, cx - r, cy - 9, r * 2, 20, 1, "—");
         return;
-    double low = 1000, high = -1000;
-    for (int k = 0; k < n; ++k) {
-        double t = clamp(w->hourly_temperature[k], -100, 100);
-        if (t < low)
-            low = t;
-        if (t > high)
-            high = t;
     }
-    if (high - low < 2) {
-        low -= 1;
-        high += 1;
+    bool clear = strstr(symbol, "clearsky"), fair = strstr(symbol, "fair"),
+         part = strstr(symbol, "partlycloudy");
+    if (clear || fair || part) {
+        int sx = clear ? cx : cx + r / 3, sy = clear ? cy : cy - r / 3;
+        weather_circle(c, sx, sy, r, BLACK);
+        weather_circle(c, sx, sy, r - 1, c->intensity ? (hero && clear ? RED : YELLOW) : PAPER);
+        if (clear)
+            return;
     }
-    int lastx = x, lasty = y + hh / 2;
-    for (int xx = 0; xx < ww; ++xx) {
-        double index = (double)xx * (n - 1) / (ww - 1);
-        int k = imin((int)index, n - 2);
-        double f = index - k;
-        double value = clamp(w->hourly_temperature[k], -100, 100) * (1 - f) +
-                       clamp(w->hourly_temperature[k + 1], -100, 100) * f;
-        int py = y + hh - 1 - (int)((value - low) / (high - low) * (hh - 1));
-        float shade_step = 0.78f / imax(1, y + hh - py);
-        for (int yy = py; yy < y + hh; ++yy)
-            pixel(c, x + xx, yy, mix(c, x + xx, yy, YELLOW, RED, (yy - py) * shade_step));
-        if (xx)
-            line(c, lastx, lasty, x + xx, py, BLACK);
-        lastx = x + xx;
-        lasty = py;
+    if (strstr(symbol, "fog")) {
+        for (int i = -1; i <= 1; i++)
+            rect(c, cx - r, cy + i * (r / 2 + 1), 2 * r, 2, BLACK);
+        return;
     }
-    for (int k = 0; k < n; ++k) {
-        int xx = x + k * (ww - 1) / (n - 1);
-        int bars = (int)clamp(w->hourly_rain[k] * 3, 0, hh / 2);
-        for (int yy = y + hh - bars; yy < y + hh; ++yy)
-            for (int dx = -3; dx <= 3; ++dx)
-                pixel(c, xx + dx, yy, mix(c, xx + dx, yy, PAPER, BLACK, 0.72f));
+    weather_circle(c, cx - r / 2, cy, r * 2 / 3, BLACK);
+    weather_circle(c, cx, cy - r / 3, r * 3 / 4, BLACK);
+    weather_circle(c, cx + r / 2, cy, r * 2 / 3, BLACK);
+    rect(c, cx - r, cy, 2 * r, r / 2 + 1, BLACK);
+    if (strstr(symbol, "rain") || strstr(symbol, "sleet"))
+        for (int i = -1; i <= 1; i++) {
+            int x = cx + i * r / 2;
+            line(c, x, cy + r, x - r / 4, cy + r + r / 3, BLACK);
+            line(c, x + 1, cy + r, x - r / 4 + 1, cy + r + r / 3, BLACK);
+        }
+    if (strstr(symbol, "snow"))
+        for (int i = -1; i <= 1; i++) {
+            int x = cx + i * r / 2, y = cy + r;
+            line(c, x - 2, y, x + 2, y, BLACK);
+            line(c, x, y - 2, x, y + 2, BLACK);
+        }
+    if (strstr(symbol, "thunder")) {
+        int ink = c->intensity ? RED : BLACK;
+        line(c, cx + 2, cy + r / 2, cx - 3, cy + r, ink);
+        line(c, cx - 3, cy + r, cx + 3, cy + r, ink);
+        line(c, cx + 3, cy + r, cx - 2, cy + r + r / 2, ink);
     }
 }
-static void weather(canvas_t *c, const home_config_t *cfg, const home_weather_t *w, int64_t now)
+static void weather_center(canvas_t *c, int cx, int y, int w, int fi, const char *s)
 {
-    int lang = lang_of(cfg);
-    bool f = cfg->units[0] == 'F';
-    int style = cfg->style[HOME_WEATHER] <= HOME_ATLAS ? cfg->style[HOME_WEATHER] : HOME_PRINT;
-    char label[160], value[32], range[80], metrics[128], rain[64], wind[32], a[24], b[24];
-    snprintf(label, sizeof label, "%.64s",
-             cfg->location[0] ? cfg->location : tr(lang, "Weather", "Pogoda"));
-    top(c, cfg, label);
-    if (!w->meta.valid) {
+    int used = imin(w, width(fi, s, 128));
+    txt(c, cx - used / 2, y, used + 2, 32, fi, s);
+}
+static const home_weather_day_t *weather_day(const home_weather_t *w, int32_t date)
+{
+    for (int i = 0; i < HOME_WEATHER_DAYS; i++)
+        if (w->days[i].date == date && w->days[i].valid)
+            return &w->days[i];
+    return NULL;
+}
+/* Enlarge the existing 64 px mask to 96 px, shrinking only to fit long values. */
+static void weather_temperature(canvas_t *c, const char *s)
+{
+    int natural = width(4, s, 40);
+    int scale = imin(150, 23000 / imax(1, natural));
+    int cursor = 0;
+    size_t at = 0, len = strlen(s);
+    while (at < len) {
+        const home_glyph_t *g = glyph(4, next_cp(s, len, &at));
+        int stride = (g->width + 7) / 8;
+        int gw = (g->width * scale + 99) / 100, gh = (g->height * scale + 99) / 100;
+        for (int y = 0; y < gh; y++)
+            for (int x = 0; x < gw; x++) {
+                int sx = x * 100 / scale, sy = y * 100 / scale;
+                if (home_font_bits[g->offset + sy * stride + sx / 8] & (0x80 >> (sx & 7))) {
+                    int px = 12 + (cursor + g->left) * scale / 100 + x;
+                    int py = 158 + g->top * scale / 100 + y;
+                    if (px >= 12 && px < 244 && py >= 73 && py < 162)
+                        pixel(c, px, py, BLACK);
+                }
+            }
+        cursor += g->advance;
+    }
+}
+static void weather(canvas_t *c, const home_config_t *cfg, const home_weather_t *w,
+                    const home_air_t *air, int64_t now)
+{
+    top(c, cfg, cfg->location[0] ? cfg->location : tr(c->lang, "Weather", "Pogoda"));
+    if (!w->meta.valid || !isfinite(w->temperature)) {
         empty(c, cfg, HOME_WEATHER, w->meta.state);
         return;
     }
-    if (!isfinite(w->temperature)) {
-        empty(c, cfg, HOME_WEATHER, HOME_ERROR);
-        return;
-    }
-    number(a, sizeof a, temp(clamp(w->temperature, -100, 100), f), 0, lang);
+    bool fahrenheit = cfg->units[0] == 'F';
+    struct tm local;
+    bool dated = home_tz_localtime(cfg->timezone, now, &local);
+    int32_t today =
+        dated ? (local.tm_year + 1900) * 10000 + (local.tm_mon + 1) * 100 + local.tm_mday : 0;
+    const home_weather_day_t *day = weather_day(w, today);
+    /* Connected squares at the top shrink into separated marks below. */
+    if (c->intensity)
+        for (int row = 0, y = 34; y < 122; row++, y += 8) {
+            int side = imax(1, 8 - imax(0, row - 1));
+            int inset = (8 - side) / 2;
+            for (int x = 14 + (row % 2) * 8; x < 386; x += 16)
+                rect(c, x + inset, y + inset, imin(side, 386 - x - inset), side, YELLOW);
+        }
+    const char *label = condition(w, c->lang);
+    text(c, 14, 38, 258, 32, width(3, label, 128) <= 258 ? 3 : 2, BLACK, label, 128);
+    char value[40], a[24], b[24], range[100];
+    number(a, sizeof a, temp(w->temperature, fahrenheit), 0, c->lang);
     snprintf(value, sizeof value, "%s°", a);
-    if (isfinite(w->low) && isfinite(w->high)) {
-        number(a, sizeof a, temp(clamp(w->low, -100, 100), f), 0, lang);
-        number(b, sizeof b, temp(clamp(w->high, -100, 100), f), 0, lang);
-        /* A spaced dash keeps "−7 – −2" apart from the minus signs. */
-        bool negative = !strncmp(a, "−", 3) || !strncmp(b, "−", 3);
-        snprintf(range, sizeof range, "%s%s%s °%s · %s", a, negative ? " – " : "–", b,
-                 f ? "F" : "C", tr(lang, "24h", "24 h"));
-    } else
-        snprintf(range, sizeof range, "°%s · %s", f ? "F" : "C",
-                 tr(lang, "No range", "Brak zakresu"));
-    if (!rain_outlook(rain, sizeof rain, cfg, w, now))
-        rain_amount(rain, sizeof rain, w, lang);
-    if (isfinite(w->wind_speed)) {
-        number(a, sizeof a, clamp(w->wind_speed, 0, 150), 1, lang);
-        snprintf(wind, sizeof wind, tr(lang, "Wind %s m/s", "Wiatr %s m/s"), a);
-    } else
-        snprintf(wind, sizeof wind, "%s", tr(lang, "Wind —", "Wiatr —"));
-    snprintf(metrics, sizeof metrics, "%s · %s", rain, wind);
-    if (width(1, metrics, sizeof metrics) > 372) {
-        rain_amount(rain, sizeof rain, w, lang);
-        snprintf(metrics, sizeof metrics, "%s · %s", rain, wind);
-    }
-    int raster = c->brush;
-    if (style == HOME_RHYTHM) {
-        txt(c, 14, 40, 178, 19, 0, tr(lang, "FORECAST", "PROGNOZA"));
-        txt(c, 12, 56, 174, 82, width(4, value, 32) > 174 ? 3 : 4, value);
-        /* Two 30 px lines with descenders need 72 px: large text starts the
-         * condition level with the FORECAST label, still above the range. */
-        const char *sky = condition(w, lang);
-        if (condition_font(cfg, sky, 191) == 3)
-            txt(c, 195, 39, 191, 74, 3, sky);
-        else
-            txt(c, 195, 53, 191, 60, 2, sky);
-        txt(c, 195, 113, 191, 23, 1, range);
-        float cloud = (float)clamp(w->cloud_cover / 100, 0, 1);
-        /* The cloud texture stops where the graph ends, above the label strip. */
-        c->raster = raster;
-        for (int x = 0; x < W; ++x) {
-            float coverage = cloud * (x / 400.0f) * 0.5f;
-            for (int y = 141; y < 216; ++y)
-                pixel(c, x, y, mix(c, x, y, PAPER, YELLOW, coverage));
-        }
-        forecast_graph(c, w, 14, 146, 372, 70);
-        c->raster = RASTER_NOISE;
-        if (!graph_valid(w))
-            rain_field(c, w, 146, 216);
-        rect(c, 14, 219, 372, 18, PAPER);
-        snprintf(label, sizeof label, tr(lang, "NEXT HOURS · °%s / mm", "KOLEJNE GODZINY · °%s / mm"),
-                 f ? "F" : "C");
-        txt(c, 14, 219, 372, 17, 0,
-            graph_valid(w) ? label
-                           : tr(lang, "Hourly detail unavailable", "Brak prognozy godzinowej"));
-        txt(c, 14, 239, 372, 21, 1, metrics);
-    } else if (style == HOME_ATLAS) {
-        for (int y = 38; y < 250; ++y)
-            for (int x = 0; x < 196; ++x)
-                if ((x + y) % 17 < 2)
-                    pixel(c, x, y, YELLOW);
-        c->raster = raster;
-        disc(c, 90, 132, 102, 99, w);
-        c->raster = RASTER_NOISE;
-        rain_field(c, w, 218, 256);
-        rect(c, 196, 35, 204, 182, PAPER);
-        txt(c, 207, 44, 180, 18, 0, tr(lang, "FORECAST", "PROGNOZA"));
-        /* The range sits under the reading in the paper column, so the rain
-         * field under the disc runs without a hole cut for a label. Two 30 px
-         * condition lines need 72 px above the reading strip at y 210, so large
-         * text lifts the reading and the range by 8 px. */
-        const char *sky = condition(w, lang);
-        int lift = condition_font(cfg, sky, 179) == 3 ? 8 : 0;
-        txt(c, 203, 53 - lift, 183, 66, width(4, value, 32) > 183 ? 3 : 4, value);
-        txt(c, 208, 121 - lift, 179, 22, 1, range);
-        txt(c, 208, 145 - lift, 179, lift ? 72 : 60, lift ? 3 : 2, sky);
-        // Weather quantities occupy a clean reading strip above the footer. It
-        // meets the range box and the rain field's last row, so nothing shows through.
-        rect(c, 194, 210, 206, 46, PAPER);
-        /* The 178 px column takes a long 12-hour sentence at 12 px on the same
-         * baseline; only a sentence too long for that falls back to the amount. */
-        if (width(1, rain, sizeof rain) <= 178)
-            txt(c, 208, 214, 178, 20, 1, rain);
-        else if (width(0, rain, sizeof rain) <= 178)
-            txt(c, 208, 218, 178, 17, 0, rain);
-        else {
-            rain_amount(rain, sizeof rain, w, lang);
-            txt(c, 208, 214, 178, 20, 1, rain);
-        }
-        txt(c, 208, 236, 178, 20, 1, wind);
+    weather_temperature(c, value);
+    weather_icon(c, w->symbol, 320, 76, 32, true);
+
+    if (day && isfinite(day->low) && isfinite(day->high)) {
+        number(a, sizeof a, temp(day->high, fahrenheit), 0, c->lang);
+        number(b, sizeof b, temp(day->low, fahrenheit), 0, c->lang);
     } else {
-        float cloud = (float)clamp(w->cloud_cover / 100, 0, 1);
-        double wind = clamp(w->wind_speed, 0, 50);
-        c->raster = raster;
-        for (int x = 184; x < W; ++x) {
-            float coverage = (x - 184) / 216.0f * (0.12f + cloud * 0.4f);
-            /* Keep exact engraved-line positions; only216 double sin calls
-             * remain, instead of38016 per full Print weather scene. */
-            int wave = (int)(wind * 2 * sin(x / 61.0));
-            for (int y = 35; y < 211; ++y) {
-                int p = mix(c, x, y, PAPER, YELLOW, coverage);
-                if (((y + wave) % 13) == 0)
-                    p = mix(c, x, y, PAPER, YELLOW, 0.72f);
-                pixel(c, x, y, p);
-            }
-        }
-        disc(c, 300, 119, 89, 78, w);
-        c->raster = RASTER_NOISE;
-        rain_field(c, w, 218, 233);
-        txt(c, 14, 40, 172, 18, 0, tr(lang, "FORECAST", "PROGNOZA"));
-        /* Range under the reading, condition below it: two lines of either
-         * size still end above the rain field, which keeps its whole width. */
-        /* Large text needs 74 px for two 30 px lines with descenders. */
-        const char *sky = condition(w, lang);
-        int lift = condition_font(cfg, sky, 171) == 3 ? 6 : 0;
-        txt(c, 12, 56 - lift, 174, 66, width(4, value, 32) > 174 ? 3 : 4, value);
-        txt(c, 14, 124 - lift, 170, 22, 1, range);
-        txt(c, 14, 148 - lift, 171, 68 + lift, lift ? 3 : 2, sky);
-        txt(c, 14, 236, 372, 23, 1, metrics);
+        snprintf(a, sizeof a, "—");
+        snprintf(b, sizeof b, "—");
     }
-    source_footer(c, cfg, &w->meta, now, "MET Norway · CC BY 4.0", w->forecast_at);
+    snprintf(range, sizeof range, "H %s°%s | L %s°%s", a, cfg->units, b, cfg->units);
+    int detail_font = width(1, range, sizeof range) <= 156 ? 1 : 0;
+    weather_center(c, 308, 128, 156, detail_font, range);
+    int aqi = air->meta.valid ? air->us_aqi : -1;
+    if (aqi >= 0)
+        snprintf(value, sizeof value, "US AQI %d", aqi);
+    else
+        snprintf(value, sizeof value, "US AQI —");
+    int ink = aqi > 100 ? RED : aqi > 50 ? YELLOW : BLACK;
+    int used = width(detail_font, value, sizeof value);
+    text(c, 308 - used / 2, 148, used + 2, 20, detail_font, ink, value, sizeof value);
+    rect(c, 14, 169, 372, 1, BLACK);
+    char date_text[40];
+    int64_t civil = 0;
+    if (dated) {
+        snprintf(date_text, sizeof date_text, "%04d-%02d-%02dT00:00:00Z", local.tm_year + 1900,
+                 local.tm_mon + 1, local.tm_mday);
+        civil = home_parse_time(date_text);
+    }
+    static const char *en[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+    static const char *pl[] = {"ND", "PN", "WT", "ŚR", "CZ", "PT", "SB"};
+    static const char *zh[] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+    for (int i = 0; i < 7; i++) {
+        int x = 14 + i * 372 / 7, end = 14 + (i + 1) * 372 / 7, cx = (x + end) / 2;
+        if (i)
+            rect(c, x, 172, 1, 92, BLACK);
+        struct tm future = {0};
+        time_t at = civil + (i + 1) * 86400;
+        if (dated)
+            gmtime_r(&at, &future);
+        int32_t key = (future.tm_year + 1900) * 10000 + (future.tm_mon + 1) * 100 + future.tm_mday;
+        day = dated ? weather_day(w, key) : NULL;
+        const char *weekday = dated ? (c->lang == LANG_ZH   ? zh[future.tm_wday]
+                                       : c->lang == LANG_PL ? pl[future.tm_wday]
+                                                            : en[future.tm_wday])
+                                    : "—";
+        int label_width = imin(end - x - 4, width(0, weekday, 40));
+        text(c, cx - label_width / 2, 174, label_width + 2, 20, 0, c->intensity ? RED : BLACK,
+             weekday, 40);
+        weather_icon(c, day ? day->symbol : "", cx, 204, 9, false);
+        if (day && isfinite(day->high)) {
+            number(a, sizeof a, temp(day->high, fahrenheit), 0, c->lang);
+            snprintf(value, sizeof value, "%s°", a);
+        } else
+            snprintf(value, sizeof value, "—");
+        weather_center(c, cx, 220, end - x - 4, width(2, value, sizeof value) < end - x - 4 ? 2 : 1,
+                       value);
+        if (day && isfinite(day->low)) {
+            number(a, sizeof a, temp(day->low, fahrenheit), 0, c->lang);
+            snprintf(value, sizeof value, "%s°", a);
+        } else
+            snprintf(value, sizeof value, "—");
+        weather_center(c, cx, 244, end - x - 4, 0, value);
+    }
+    source_footer(c, cfg, &w->meta, now, "", w->forecast_at);
 }
 static uint32_t fingerprint(const char *s, size_t cap)
 {
@@ -1238,18 +1093,18 @@ static void feed(canvas_t *c, const home_config_t *cfg, const home_feed_t *f, in
     int style = cfg->style[HOME_FEED] <= HOME_ATLAS ? cfg->style[HOME_FEED] : HOME_PRINT;
     text(c, 14, 44, 372, 22, 1, BLACK,
          f->source[0] ? f->source : tr(lang, "Your source", "Twoje źródło"), sizeof f->source);
-    if (style == HOME_ATLAS) {
-        signature(c, f->title, sizeof f->title, style, 76, 246,
-                  &(paper_window_t){14, 77, 342, 158});
-        rect(c, 14, 77, 342, 158, PAPER);
-        poster_text(c, 24, 81, 322, 150, f->title, sizeof f->title, cfg->large_text);
-    } else if (style == HOME_RHYTHM) {
-        signature(c, f->title, sizeof f->title, style, 218, 254, NULL);
-        poster_text(c, 14, 79, 372, 138, f->title, sizeof f->title, cfg->large_text);
+    if (!f->summary[0]) {
+        poster_text(c, 14, 76, 372, 177, f->title, sizeof f->title, cfg->large_text);
+    } else if (style == HOME_ATLAS) {
+        poster_text(c, 14, 76, 172, 177, f->title, sizeof f->title, cfg->large_text);
+        rect(c, 194, 78, 1, 172, BLACK);
+        text(c, 206, 78, 180, 174, cfg->large_text ? 1 : 0, BLACK, f->summary, sizeof f->summary);
     } else {
-        signature(c, f->title, sizeof f->title, style, 78, 248, &(paper_window_t){0, 76, 376, 174});
-        rect(c, 0, 76, 376, 174, PAPER);
-        poster_text(c, 14, 81, 348, 168, f->title, sizeof f->title, cfg->large_text);
+        int title_height = style == HOME_RHYTHM ? 65 : 78;
+        poster_text(c, 14, 72, 372, title_height, f->title, sizeof f->title, cfg->large_text);
+        rect(c, 14, 77 + title_height, 372, 1, BLACK);
+        text(c, 14, 85 + title_height, 372, 172 - title_height, cfg->large_text ? 1 : 0, BLACK,
+             f->summary, sizeof f->summary);
     }
     source_footer(c, cfg, &f->meta, now,
                   tr(lang, "Full story in phone panel", "Całość w panelu telefonu"), f->published_at);
@@ -1279,419 +1134,6 @@ static void note(canvas_t *c, const home_config_t *cfg, int64_t now)
     txt(c, 14, 277, 220, 19, 0, tr(lang, "Yours to keep in view.", "Warto mieć to na widoku."));
     txt(c, 270, 277, 116, 19, 0, "emini.ink/home");
     (void)now;
-}
-/* Card for a screen index outside weather/feed/note: the device name like every
- * other screen ("emini HOME" without one), a title, one line of help. */
-
-/* ---- Air: air quality, UV and pollen (0.5.0). Every screen uses all four pigments
- * (D-HOME-CC-24): the PM2.5 scale is one warm ramp paper -> yellow -> red, so good air is a
- * light yellow tone and bad air a deep red; beyond the European scale the field is solid red
- * with a black outline. The red "now" marks and the UV sun are the accents. */
-static const char *level_name(int level, int lang)
-{
-    static const char *const en[6] = {"Very good", "Good", "Moderate", "Poor", "Very poor", "Extremely poor"};
-    static const char *const po[6] = {"Bardzo dobre", "Dobre", "Umiarkowane", "Złe", "Bardzo złe", "Skrajnie złe"};
-    static const char *const zh[6] = {"很好", "良好", "中等",
-                                      "较差", "很差", "极差"};
-    if (level < 0 || level > 5)
-        return tr(lang, "No index", "Brak indeksu");
-    return words(lang, en, po, zh)[level];
-}
-/* European index bands for PM2.5 in ug/m3 (EEA): 10, 20, 25, 50, 75. */
-static int pm25_level(double v)
-{
-    if (!isfinite(v) || v < 0)
-        return -1;
-    static const double bands[5] = {10, 20, 25, 50, 75};
-    for (int i = 0; i < 5; ++i)
-        if (v <= bands[i])
-            return i;
-    return 5;
-}
-/* One pixel of the PM2.5 scale: t = 0 paper, 0.5 orange, 1 red (75 ug/m3 and beyond). */
-static int pm_tone(canvas_t *c, int x, int y, double v)
-{
-    float t = (float)clamp(v / 75.0, 0, 1);
-    return mix3(c, x, y, PAPER, YELLOW, RED, (1 - t) * (1 - t), 2 * t * (1 - t) + 0.08f, t * t);
-}
-static void tone_fill(canvas_t *c, int x, int y, int w, int h, double v)
-{
-    if (w <= 0 || h <= 0)
-        return;
-    if (!isfinite(v)) {
-        for (int yy = y; yy < y + h; ++yy)
-            for (int xx = x; xx < x + w; ++xx)
-                if (((xx + yy) & 3) == 0)
-                    pixel(c, xx, yy, BLACK);
-        return;
-    }
-    if (v > 75) {
-        rect(c, x, y, w, h, BLACK);
-        rect(c, x + 1, y + 1, w - 2, h - 2, RED);
-        return;
-    }
-    for (int yy = imax(y, 0); yy < imin(y + h, H); ++yy)
-        for (int xx = imax(x, 0); xx < imin(x + w, W); ++xx)
-            pixel(c, xx, yy, pm_tone(c, xx, yy, v));
-}
-/* The scale as a legend bar with a black marker at today's value. */
-static void scale_bar(canvas_t *c, int x, int y, int w, int h, double v)
-{
-    for (int xx = x; xx < x + w; ++xx) {
-        /* one value per 2 px cell, so the dither decision never differs inside a cell (R0) */
-        double value = ((xx & ~1) - x) / (double)(w - 1) * 75.0;
-        for (int yy = y; yy < y + h; ++yy)
-            pixel(c, xx, yy, pm_tone(c, xx, yy, value));
-    }
-    rect(c, x, y + h, w, 1, BLACK);
-    if (isfinite(v) && v >= 0) {
-        int mx = x + (int)(clamp(v, 0, 75) / 75.0 * (w - 3));
-        rect(c, mx, y - 3, 3, h + 6, BLACK);
-    }
-}
-static int uv_level(double uv)
-{
-    if (!isfinite(uv) || uv < 0)
-        return -1;
-    return uv < 3 ? 0 : uv < 6 ? 1 : uv < 8 ? 2 : uv < 11 ? 3 : 4;
-}
-static const char *uv_name(int level, int lang)
-{
-    static const char *const en[5] = {"low", "moderate", "high", "very high", "extreme"};
-    static const char *const po[5] = {"niskie", "umiarkowane", "wysokie", "bardzo wysokie", "ekstremalne"};
-    static const char *const zh[5] = {"低", "中等", "高", "很高",
-                                      "极高"};
-    return level < 0 ? "" : words(lang, en, po, zh)[level];
-}
-/* "UV 6 · high · sunscreen from 11:00"; the hour is the first with UV >= 3 today. */
-static void uv_line(char *out, size_t len, const home_config_t *cfg, const home_air_t *a, int lang)
-{
-    int level = uv_level(a->uv_index);
-    if (level < 0) {
-        snprintf(out, len, "UV —");
-        return;
-    }
-    char v[16], when[64] = "";
-    number(v, sizeof v, clamp(a->uv_index, 0, 20), 0, lang);
-    int first = -1;
-    for (int k = 0; k < imin(a->hourly_count, HOME_AIR_HOURS); ++k)
-        if (isfinite(a->hourly_uv[k]) && a->hourly_uv[k] >= 3) {
-            first = k;
-            break;
-        }
-    if (first == 0)
-        snprintf(when, sizeof when, " · %s", tr(lang, "sunscreen now", "krem teraz"));
-    else if (first > 0 && time_valid(a->forecast_at)) {
-        struct tm at;
-        if (home_tz_localtime(cfg->timezone, a->forecast_at + (int64_t)first * 3600, &at)) {
-            char t[24];
-            clock_text(t, sizeof t, &at, cfg->clock24, false, false);
-            snprintf(when, sizeof when, tr(lang, " · sunscreen from %s", " · krem od %s"), t);
-        }
-    }
-    snprintf(out, len, "UV %s · %s%s", v, uv_name(level, lang), when);
-}
-/* The UV sun: a disc that grows and reddens with the index, with eight rays. */
-static void uv_sun(canvas_t *c, int cx, int cy, double uv, double size)
-{
-    if (!isfinite(uv) || uv < 0)
-        uv = 0;
-    int r = 7 + (int)(clamp(uv, 0, 11) * size);
-    float heat = (float)clamp(uv / 11.0, 0, 1) * 0.85f;
-    for (int y = cy - r; y <= cy + r; ++y)
-        for (int x = cx - r; x <= cx + r; ++x) {
-            /* the heat of a pixel is that of its 2 px cell, so yellow and red never split a cell (R0) */
-            int dx = (x & ~1) + 1 - cx, dy = (y & ~1) + 1 - cy;
-            if (dx * dx + dy * dy <= r * r)
-                pixel(c, x, y, mix(c, x, y, YELLOW, RED, heat * (1.0f - (dx * dx + dy * dy) / (float)(r * r))));
-        }
-    for (int k = 0; k < 8; ++k) {
-        double ang = k * 3.14159265358979323846 / 4;
-        int x0 = cx + (int)((r + 3) * cos(ang)), y0 = cy + (int)((r + 3) * sin(ang));
-        int x1 = cx + (int)((r + 7 + (k & 1) * 3) * cos(ang)), y1 = cy + (int)((r + 7 + (k & 1) * 3) * sin(ang));
-        int p = uv >= 8 ? RED : YELLOW; /* 2 px thick whatever the direction (R0) */
-        line(c, x0, y0, x1, y1, p);
-        line(c, x0 + 1, y0, x1 + 1, y1, p);
-        line(c, x0, y0 + 1, x1, y1 + 1, p);
-        line(c, x0 + 1, y0 + 1, x1 + 1, y1 + 1, p);
-    }
-}
-/* 0 none, 1 low, 2 moderate, 3 high, from grains per m3; grass counts lower. */
-static int pollen_level(int kind, double v)
-{
-    if (!isfinite(v) || v < 0)
-        return -1;
-    double mid = kind == HOME_POLLEN_GRASS ? 5 : 20, hi = kind == HOME_POLLEN_GRASS ? 20 : 80;
-    return v < 1 ? 0 : v < mid ? 1 : v < hi ? 2 : 3;
-}
-static const char *pollen_name(int kind, int lang)
-{
-    static const char *const en[4] = {"Alder", "Birch", "Grass", "Mugwort"};
-    static const char *const po[4] = {"Olcha", "Brzoza", "Trawy", "Bylica"};
-    static const char *const zh[4] = {"桤木", "桦树", "禾草", "艾蒿"};
-    return words(lang, en, po, zh)[kind & 3];
-}
-/* Four tiles "Birch ●●●○": 6 px dots, yellow for low, orange for moderate, red for high;
- * hidden when the data has no pollen (outside Europe). */
-static int pollen_row(canvas_t *c, const home_air_t *a, int x, int y, int w, int lang, bool list)
-{
-    int shown = 0;
-    for (int k = 0; k < HOME_POLLEN_COUNT; ++k)
-        if (isfinite(a->pollen[k]))
-            ++shown;
-    if (!shown)
-        return 0;
-    int i = 0;
-    for (int k = 0; k < HOME_POLLEN_COUNT; ++k) {
-        if (!isfinite(a->pollen[k]))
-            continue;
-        int level = pollen_level(k, a->pollen[k]);
-        int tx = list ? x : x + i * (w / shown), ty = list ? y + i * 20 : y;
-        int tw = list ? w - 30 : w / shown - 30;
-        const char *name = pollen_name(k, lang);
-        if (width(1, name, 16) <= tw)
-            txt(c, tx, ty, tw, 20, 1, name);
-        else
-            txt(c, tx, ty + 2, tw, 17, 0, name);
-        int dx = (list ? x + w - 28 : tx + (w / shown) - 30) & ~1; /* even origin, even pitch: R0 */
-        for (int d = 0; d < 3; ++d) {
-            int ox = dx + d * 10, oy = (ty + 5) & ~1;
-            if (d < level) {
-                for (int yy = 0; yy < 6; ++yy)
-                    for (int xx = 0; xx < 6; ++xx)
-                        pixel(c, ox + xx, oy + yy,
-                              level >= 3 ? RED : level == 2 ? mix(c, ox + xx, oy + yy, YELLOW, RED, 0.5f) : YELLOW);
-            } else {
-                rect(c, ox, oy, 6, 6, PAPER);
-                for (int e = 0; e < 6; ++e) {
-                    pixel(c, ox + e, oy, BLACK);
-                    pixel(c, ox + e, oy + 5, BLACK);
-                    pixel(c, ox, oy + e, BLACK);
-                    pixel(c, ox + 5, oy + e, BLACK);
-                }
-            }
-        }
-        ++i;
-    }
-    return shown;
-}
-static void air_headline(char *value, size_t vlen, char *word, size_t wlen, const home_config_t *cfg,
-                         const home_air_t *a, int lang, int *level)
-{
-    *level = home_air_level(a->european_aqi);
-    if (*level < 0)
-        *level = pm25_level(a->pm2_5);
-    if (cfg->air_main == 1 && a->us_aqi >= 0)
-        snprintf(value, vlen, "%d", a->us_aqi);
-    else if (cfg->air_main == 2 && isfinite(a->pm2_5))
-        number(value, vlen, clamp(a->pm2_5, 0, 999), 0, lang);
-    else if (a->european_aqi >= 0)
-        snprintf(value, vlen, "%d", a->european_aqi);
-    else if (isfinite(a->pm2_5))
-        number(value, vlen, clamp(a->pm2_5, 0, 999), 0, lang);
-    else
-        snprintf(value, vlen, "—");
-    snprintf(word, wlen, "%s", level_name(*level, lang));
-}
-static void air_metrics(char *out, size_t len, const home_config_t *cfg, const home_air_t *a, int lang)
-{
-    char pm[24], pm10[24], us[24];
-    if (isfinite(a->pm2_5))
-        number(pm, sizeof pm, clamp(a->pm2_5, 0, 999), 0, lang);
-    else
-        snprintf(pm, sizeof pm, "—");
-    if (isfinite(a->pm10))
-        number(pm10, sizeof pm10, clamp(a->pm10, 0, 999), 0, lang);
-    else
-        snprintf(pm10, sizeof pm10, "—");
-    if (a->us_aqi >= 0)
-        snprintf(us, sizeof us, " · US AQI %d", a->us_aqi);
-    else
-        us[0] = 0;
-    if (cfg->air_main == 2)
-        snprintf(out, len, "PM10 %s%s", pm10, us);
-    else
-        snprintf(out, len, "PM2.5 %s · PM10 %s%s", pm, pm10, us);
-}
-/* 24 hourly PM2.5 bars, each in the tone of its own value. */
-static void air_bars(canvas_t *c, const home_air_t *a, int x, int y, int w, int h)
-{
-    int n = imin(a->hourly_count, HOME_AIR_HOURS);
-    if (n < 2)
-        return;
-    /* The scale follows the day's maximum (at least 20 ug/m3): clean air fills the chart with
-     * pale yellow bars instead of leaving it empty, and the tone still tells the band. */
-    double top = 20;
-    for (int k = 0; k < n; ++k)
-        if (isfinite(a->hourly_pm2_5[k]) && a->hourly_pm2_5[k] * 1.15 > top)
-            top = clamp(a->hourly_pm2_5[k] * 1.15, 20, 999);
-    int pitch = w / HOME_AIR_HOURS, bw = imax((pitch - 1) & ~1, 2);
-    rect(c, x, y + h, w, 1, BLACK);
-    for (int k = 0; k < n; ++k) {
-        double v = a->hourly_pm2_5[k];
-        if (!isfinite(v))
-            continue;
-        int bh = ((int)(clamp(v, 0, top) / top * (h - 2)) + 2) & ~1;
-        /* even origin and height: a bar never splits a 2 px colour cell (R0) */
-        tone_fill(c, (x + k * pitch) & ~1, y + h - bh, bw, bh, v);
-    }
-    rect(c, x, y - 2, 1, h + 3, BLACK); /* axis; index 0 is now */
-}
-static void air(canvas_t *c, const home_config_t *cfg, const home_air_t *a, int64_t now)
-{
-    int lang = lang_of(cfg);
-    top(c, cfg, tr(lang, "AIR", "POWIETRZE"));
-    if (!a->meta.valid) {
-        empty(c, cfg, HOME_AIR, a->meta.state);
-        return;
-    }
-    int style = cfg->style[HOME_AIR] <= HOME_ATLAS ? cfg->style[HOME_AIR] : HOME_PRINT;
-    int level;
-    char value[24], word[40], uv[96], metrics[96];
-    air_headline(value, sizeof value, word, sizeof word, cfg, a, lang, &level);
-    uv_line(uv, sizeof uv, cfg, a, lang);
-    air_metrics(metrics, sizeof metrics, cfg, a, lang);
-    const char *unit = cfg->air_main == 2 ? tr(lang, "PM2.5 in µg per m3", "PM2.5 w µg na m3")
-                       : cfg->air_main == 1 ? "US AQI"
-                                            : tr(lang, "EU index", "Indeks EU");
-    int raster = c->brush, n = imin(a->hourly_count, HOME_AIR_HOURS);
-    if (style == HOME_RHYTHM) {
-        txt(c, 14, 40, 178, 19, 0, tr(lang, "AIR QUALITY", "JAKOŚĆ POWIETRZA"));
-        txt(c, 14, 56, 214, 40, width(3, word, sizeof word) > 214 ? 2 : 3, word);
-        txt(c, 14, 90, 200, 18, 0, unit);
-        txt(c, 240, 42, 146, 60, width(5, value, sizeof value) > 146 ? 7 : 5, value);
-        scale_bar(c, 240, 104, 146, 5, a->pm2_5);
-        /* PM2.5 over 24 h, the fill in the tone of each hour; UV as a yellow curve with the sun
-         * at its peak. */
-        int gx = 14, gy = 116, gw = 372, gh = 96;
-        double top = 20; /* the day's maximum sets the scale, so clean air is not an empty field */
-        for (int k = 0; k < n; ++k)
-            if (isfinite(a->hourly_pm2_5[k]) && a->hourly_pm2_5[k] * 1.15 > top)
-                top = clamp(a->hourly_pm2_5[k] * 1.15, 20, 999);
-        c->raster = raster;
-        int lastx = -1, lasty = 0;
-        for (int xx = 0; xx < gw && n >= 2; ++xx) {
-            double index = (double)xx * (n - 1) / (gw - 1);
-            int k = imin((int)index, n - 2);
-            double f = index - k, v0 = a->hourly_pm2_5[k], v1 = a->hourly_pm2_5[k + 1];
-            if (!isfinite(v0) || !isfinite(v1)) {
-                lastx = -1;
-                continue;
-            }
-            double v = v0 * (1 - f) + v1 * f;
-            int py = gy + gh - 1 - (int)(clamp(v, 0, top) / top * (gh - 1));
-            /* the tone comes from the even column of the cell (R0); the height stays per column */
-            double cell_index = (double)(xx & ~1) * (n - 1) / (gw - 1);
-            int ck = imin((int)cell_index, n - 2);
-            double cf = cell_index - ck;
-            double cv = isfinite(a->hourly_pm2_5[ck]) && isfinite(a->hourly_pm2_5[ck + 1])
-                            ? a->hourly_pm2_5[ck] * (1 - cf) + a->hourly_pm2_5[ck + 1] * cf
-                            : v;
-            for (int yy = py; yy < gy + gh; ++yy)
-                pixel(c, gx + xx, yy, cv > 75 ? RED : pm_tone(c, gx + xx, yy, cv));
-            if (lastx >= 0)
-                line(c, lastx, lasty, gx + xx, py, BLACK);
-            lastx = gx + xx;
-            lasty = py;
-        }
-        c->raster = RASTER_NOISE;
-        lastx = -1;
-        int peak_x = -1, peak_y = gy + gh;
-        for (int xx = 0; xx < gw && n >= 2; ++xx) {
-            double index = (double)xx * (n - 1) / (gw - 1);
-            int k = imin((int)index, n - 2);
-            double f = index - k, u0 = a->hourly_uv[k], u1 = a->hourly_uv[k + 1];
-            if (!isfinite(u0) || !isfinite(u1)) {
-                lastx = -1;
-                continue;
-            }
-            int py = gy + gh - 1 - (int)(clamp(u0 * (1 - f) + u1 * f, 0, 11) / 11.0 * (gh - 1));
-            if (py < peak_y) {
-                peak_y = py;
-                peak_x = gx + xx;
-            }
-            if (lastx >= 0) {
-                line(c, lastx, lasty, gx + xx, py, YELLOW);
-                line(c, lastx, lasty + 1, gx + xx, py + 1, YELLOW);
-            }
-            lastx = gx + xx;
-            lasty = py;
-        }
-        if (peak_x >= 0 && peak_y < gy + gh - 4)
-            uv_sun(c, imin(imax(peak_x, gx + 44), gx + gw - 24), imax(peak_y, gy + 14), a->uv_index, 0.4);
-        rect(c, gx, gy + gh, gw, 1, BLACK);
-        rect(c, gx, gy - 2, 1, gh + 3, BLACK); /* axis; the left edge is now */
-        txt(c, 14, 215, 372, 17, 0,
-            tr(lang, "NEXT 24 H · PM2.5, UV IN YELLOW", "KOLEJNE 24 H · PM2.5, UV NA ŻÓŁTO"));
-        txt(c, 14, 236, 372, 21, 1, uv);
-    } else if (style == HOME_ATLAS) {
-        /* The dial: 24 hour segments clockwise from now at the top, each in the tone of its
-         * value; a soft yellow glow inside; the red hand marks now. */
-        int cx = 100, cy = 146, ro = 96, ri = 66;
-        c->raster = raster;
-        for (int y = cy - ro; y <= cy + ro; ++y)
-            for (int x = cx - ro; x <= cx + ro; ++x) {
-                /* every decision (inside, ring, hour wedge, glow) from the 2 px cell, so a cell
-                 * never holds two pigments by geometry alone (R0) */
-                double dx = (x & ~1) + 1 - cx, dy = (y & ~1) + 1 - cy, r = sqrt(dx * dx + dy * dy);
-                if (r > ro)
-                    continue;
-                if (r < ri) {
-                    pixel(c, x, y, mix(c, x, y, PAPER, YELLOW, 0.55f * (float)((r / ri) * (r / ri))));
-                    continue;
-                }
-                double ang = atan2(dx, -dy);
-                if (ang < 0)
-                    ang += 2 * 3.14159265358979323846;
-                int k = (int)(ang / (2 * 3.14159265358979323846) * HOME_AIR_HOURS);
-                if (k >= n || !isfinite(a->hourly_pm2_5[k])) {
-                    if (((x + y) & 3) == 0)
-                        pixel(c, x, y, BLACK);
-                    continue;
-                }
-                double v = a->hourly_pm2_5[k];
-                pixel(c, x, y, v > 75 ? RED : pm_tone(c, x, y, v));
-            }
-        c->raster = RASTER_NOISE;
-        for (int y = cy - ro; y <= cy + ro; ++y)
-            for (int x = cx - ro; x <= cx + ro; ++x) {
-                /* the outlines follow the same 2 px cells as the fill, so they never leave a lone
-                 * colour pixel beside them (R0) */
-                double dx = (x & ~1) + 1 - cx, dy = (y & ~1) + 1 - cy, r = sqrt(dx * dx + dy * dy);
-                if ((r > ro - 2 && r <= ro) || (r >= ri && r < ri + 2))
-                    pixel(c, x, y, BLACK);
-            }
-        rect(c, cx - 1, cy - ro - 5, 3, ro - ri + 10, RED);
-        int vf = width(7, value, sizeof value) > 120 ? 3 : 7;
-        int vw = imin(width(vf, value, sizeof value), 120), uw = imin(width(0, unit, 64), 124);
-        txt(c, cx - vw / 2, cy - (vf == 7 ? 30 : 22), vw + 2, vf == 7 ? 50 : 36, vf, value);
-        txt(c, cx - uw / 2, cy + 14, uw + 2, 18, 0, unit);
-        txt(c, 208, 62, 178, width(3, word, sizeof word) > 178 ? 60 : 36, width(3, word, sizeof word) > 178 ? 2 : 3, word);
-        scale_bar(c, 208, 104, 178, 5, a->pm2_5);
-        uv_sun(c, 368, 50, a->uv_index, 0.6);
-        txt(c, 208, 44, 140, 18, 0, tr(lang, "AIR QUALITY", "JAKOŚĆ POWIETRZA"));
-        txt(c, 208, 124, 178, 40, 1, uv);
-        pollen_row(c, a, 208, 170, 178, lang, true);
-        txt(c, 14, 245, 372, 14, 0, metrics);
-    } else {
-        txt(c, 14, 40, 172, 18, 0, tr(lang, "AIR QUALITY", "JAKOŚĆ POWIETRZA"));
-        txt(c, 12, 56, 174, 66, width(4, value, sizeof value) > 174 ? 3 : 4, value);
-        txt(c, 14, 124, 170, 18, 0, unit);
-        txt(c, 14, 142, 176, width(3, word, sizeof word) > 176 ? 60 : 36, width(3, word, sizeof word) > 176 ? 2 : 3, word);
-        scale_bar(c, 14, 182, 172, 5, a->pm2_5);
-        c->raster = raster;
-        air_bars(c, a, 200, 66, 186, 66);
-        c->raster = RASTER_NOISE;
-        uv_sun(c, 368, 48, a->uv_index, 0.6);
-        txt(c, 200, 136, 90, 17, 0, tr(lang, "NOW", "TERAZ"));
-        txt(c, 300, 136, 86, 17, 0, "+24 h");
-        txt(c, 14, 194, 372, 20, 1, uv);
-        if (!pollen_row(c, a, 14, 216, 372, lang, false))
-            txt(c, 14, 216, 372, 20, 1,
-                tr(lang, "No pollen forecast for this place", "Brak prognozy pyłków dla tego miejsca"));
-        txt(c, 14, 241, 372, 17, 0, metrics);
-    }
-    source_footer(c, cfg, &a->meta, now, "Open-Meteo · CC BY 4.0", a->forecast_at);
 }
 static void status(canvas_t *c, const char *name, size_t cap, const char *title, const char *body)
 {
@@ -2333,13 +1775,11 @@ void home_render(const home_config_t *cfg, const home_data_t *data, home_screen_
         top(&c, cfg, tr(c.lang, "Weather", "Pogoda"));
         empty(&c, cfg, HOME_WEATHER, HOME_EMPTY);
     } else if (screen == HOME_WEATHER)
-        weather(&c, cfg, &data->weather, now);
+        weather(&c, cfg, &data->weather, &data->air, now);
     else if (screen == HOME_SKY)
         sky(&c, cfg, now);
     else if (screen == HOME_FEED)
         feed(&c, cfg, &data->feed, now);
-    else if (screen == HOME_AIR)
-        air(&c, cfg, &data->air, now);
     else if (screen == HOME_POKEMON)
         pokemon(&c, cfg, &data->pokemon, now);
     else if (screen == HOME_NOTE)
@@ -2347,15 +1787,9 @@ void home_render(const home_config_t *cfg, const home_data_t *data, home_screen_
     else {
         /* Status keeps its fixed texture and intensity, as home_render_status() does. */
         canvas_t card = {frame, 1, 2, c.lang, RASTER_NOISE, RASTER_NOISE};
-        /* Air exists in the settings since 0.5.0; its card comes next. */
-        const char *title = screen == HOME_AIR ? tr(c.lang, "Air", "Powietrze")
-                                               : tr(c.lang, "Choose a screen.", "Wybierz ekran.");
-        const char *body =
-            screen == HOME_AIR
-                ? tr(c.lang, "This screen arrives with the next update.",
-                     "Ten ekran pojawi się w następnej aktualizacji.")
-                : tr(c.lang, "Open the panel on your phone and choose what Home shows.",
-                     "Otwórz panel w telefonie i wybierz, co ma pokazywać Home.");
+        const char *title = tr(c.lang, "Choose a screen.", "Wybierz ekran.");
+        const char *body = tr(c.lang, "Open the panel on your phone and choose what Home shows.",
+                             "Otwórz panel w telefonie i wybierz, co ma pokazywać Home.");
         status(&card, cfg->name, sizeof cfg->name, title, body);
     }
 }

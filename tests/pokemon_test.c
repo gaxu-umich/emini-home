@@ -28,9 +28,7 @@ static void settings(void)
     home_config_defaults(&c);
     assert(!c.enabled[HOME_POKEMON]);
     assert(home_screen_index("pokemon") == HOME_POKEMON);
-    for (int count = 3; count <= 6; count++) {
-        if (count == 4)
-            continue;
+    for (int count = 3; count <= HOME_SCREEN_COUNT; count++) {
         cJSON *j = home_config_json(&c, false);
         assert(j);
         cJSON *enabled = cJSON_GetObjectItemCaseSensitive(j, "enabled");
@@ -51,6 +49,41 @@ static void settings(void)
         free(json);
         cJSON_Delete(j);
     }
+    /* Legacy five/six-screen settings: enabled uses canonical positions,
+     * order can be arbitrary, and Air-only setups must still display Weather. */
+    for (int count = 5; count <= 6; count++) {
+        for (int air_only = 0; air_only < 2; air_only++) {
+            cJSON *old = home_config_json(&c, false);
+            cJSON *enabled = cJSON_CreateArray(), *order = cJSON_CreateArray();
+            const char *names[] = {"weather", "feed", "note", "sky", "air", "pokemon"};
+            for (int i = 0; i < count; i++) {
+                cJSON_AddItemToArray(enabled, cJSON_CreateBool(i == 4 || (!air_only && i == 5)));
+                cJSON_AddItemToArray(order, cJSON_CreateString(names[count - i - 1]));
+            }
+            cJSON_ReplaceItemInObjectCaseSensitive(old, "enabled", enabled);
+            cJSON_ReplaceItemInObjectCaseSensitive(old, "order", order);
+            cJSON_ReplaceItemInObjectCaseSensitive(old, "fixed_screen", cJSON_CreateString("air"));
+            cJSON *styles = cJSON_GetObjectItemCaseSensitive(old, "styles");
+            cJSON_AddStringToObject(styles, "air", "atlas");
+            if (count == 5) cJSON_DeleteItemFromObjectCaseSensitive(styles, "pokemon");
+            cJSON_AddStringToObject(old, "air_main", "pm25");
+            cJSON *slot = cJSON_GetArrayItem(cJSON_GetObjectItemCaseSensitive(old, "day"), 0);
+            cJSON_ReplaceItemInObjectCaseSensitive(slot, "screen", cJSON_CreateString("air"));
+            char *text = cJSON_PrintUnformatted(old);
+            assert(home_config_decode(text, strlen(text), &loaded, NULL, false, error));
+            assert(loaded.fixed_screen == HOME_WEATHER && loaded.day_screen[0] == HOME_WEATHER);
+            assert(loaded.enabled[HOME_POKEMON] == (count == 6 && !air_only));
+            assert(loaded.enabled[HOME_WEATHER] == (count == 5 || air_only));
+            assert(loaded.order[0] == (count == 6 ? HOME_POKEMON : HOME_SKY));
+            cJSON *updated = home_config_json(&loaded, false);
+            assert(!cJSON_GetObjectItemCaseSensitive(updated, "air_main"));
+            assert(!cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(updated, "styles"), "air"));
+            cJSON_Delete(updated);
+            free(text);
+            cJSON_Delete(old);
+        }
+    }
+    assert(home_screen_index("air") == -1);
     c.enabled[HOME_POKEMON] = true;
     c.fixed_screen = HOME_POKEMON;
     c.style[HOME_POKEMON] = HOME_ATLAS;
@@ -71,9 +104,14 @@ static void settings(void)
     free(json);
     cJSON_Delete(j);
 }
+int home_screens_test(const char *, const char *);
 int main(int argc, char **argv)
 {
     assert(argc >= 2);
+    if (!strcmp(argv[1], "screens")) {
+        assert(argc == 4);
+        return home_screens_test(argv[2], argv[3]);
+    }
     if (!strcmp(argv[1], "settings")) {
         settings();
         return 0;
