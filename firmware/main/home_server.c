@@ -483,7 +483,7 @@ static esp_err_t api_inner(httpd_req_t *r)
             memset(&home_runtime.data.feed, 0, sizeof(home_runtime.data.feed));
         if (!c.feed_url[0])
             home_runtime.refresh_requested &= ~2U;
-        if (!c.enabled[HOME_AIR] && !c.enabled[HOME_WEATHER])
+        if (!c.enabled[HOME_WEATHER])
             home_runtime.refresh_requested &= ~4U;
         home_runtime.config = c;
         home_runtime.request_id++; /* Save changes settings; explicit Show publishes them. */
@@ -647,9 +647,8 @@ static esp_err_t api_inner(httpd_req_t *r)
         home_lock();
         if (!home_runtime.config.feed_url[0])
             mask &= ~2U;
-        /* Both Weather and Air use air quality for the saved place. */
-        if ((!home_runtime.config.enabled[HOME_AIR] &&
-             !home_runtime.config.enabled[HOME_WEATHER]) || !home_runtime.config.location_ready)
+        /* Weather includes US AQI for the saved place. */
+        if (!home_runtime.config.enabled[HOME_WEATHER] || !home_runtime.config.location_ready)
             mask &= ~4U;
         home_runtime.refresh_requested |= mask;
         home_unlock();

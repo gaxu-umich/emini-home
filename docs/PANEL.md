@@ -60,21 +60,18 @@ to open a new one.
 
 The **On your Home** section shows the last picture the display confirmed, pixel
 for pixel, with its status and the battery. Below it, **Your screens** lists the
-six kinds of information:
+five kinds of information:
 
 | Screen | What it shows |
 | --- | --- |
-| Weather | The forecast from MET Norway for the place you set |
+| Weather | The forecast from MET Norway and US AQI from Open-Meteo for the place you set |
 | News | One headline from a public RSS or Atom feed: the first item for BBC World (the default), the newest entry for other HTTPS feeds |
 | Your note | A few words of your own |
 | Sky | Sunrise, sunset and the moon, worked out on the device from the place you set; nothing is downloaded |
-| Air | Air quality, UV and pollen from Open-Meteo for the place you set |
 | Pokémon | One of the original 151 each day, with a sprite and English Pokédex introduction |
 
-Sky and Air are new, and they start switched off: your display keeps showing
-what it showed before. Air's picture arrives with the next update, so until then
-that screen says so when you switch it on. Turn one on, or off, under **In your
-collection** on its page.
+Sky and Pokémon start switched off. Turn a screen on or off under **In your
+collection** on its page. Legacy Air settings are migrated to Weather.
 
 Tap a screen to open its page:
 
@@ -123,16 +120,13 @@ network does not.
 
 <p align="center"><img src="images/panel-sky.webp" width="260" alt="The Sky screen page in the panel: a preview and the note that everything is computed on the device"></p>
 
-### The Air screen
+### Weather air quality
 
-Air shows the European air quality index, PM2.5 for the next 24 hours, the UV
-index with a sunscreen hint and, in Europe, four pollens, from Open-Meteo's
-Air Quality service. On its page you choose the headline number: the European
-index, the US AQI or PM2.5. Home asks Open-Meteo only while this screen is
-switched on, about once an hour, and sends it the saved coordinates and
-nothing else.
-
-<p align="center"><img src="images/panel-air.webp" width="260" alt="The Air screen page in the panel: the Open-Meteo source line and the choice of the headline number"></p>
+US AQI appears below today's high/low temperatures in the same font size.
+It is black through 50, yellow from 51 to 100, and red above 100; unavailable
+values show a dash. Home requests only US AQI from Open-Meteo's Air Quality
+service while Weather is enabled, using the saved coordinates. Refreshing
+Weather refreshes both weather and AQI. There is no separate Air screen.
 
 ### Pokémon of the day
 

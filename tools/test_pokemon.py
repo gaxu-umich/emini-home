@@ -77,16 +77,45 @@ static size_t tinfl_decompress_mem_to_mem(void *o,size_t n,const void *i,size_t 
         weather=work/'weather.json'
         weather.write_text(json.dumps({'properties':{'meta':{'updated_at':begin.isoformat().replace('+00:00','Z')},'timeseries':series}}))
         run(exe,'screens',weather,out)
+        # Only the AQI line occupies this region. Check strict color boundaries
+        # and unavailable values against the actual packed display pixels.
+        for name, expected in [('50',0),('51',2),('100',2),('101',3),('-1',0),('unavailable',0)]:
+            frame=(out/('weather-aqi-'+name+'.frame')).read_bytes()
+            ink=set()
+            for y in range(148,169):
+                for x in range(230,386):
+                    at=y*400+x
+                    color=(frame[at//4] >> (6-2*(at%4))) & 3
+                    if color != 1: ink.add(color)
+            assert ink == {expected}, (name, ink)
         run('node', '-e', '''const assert=require('node:assert/strict');
 const C=require(process.argv[1]), c=require(process.argv[2]);
 assert.deepEqual(C.validate(c), []);
-assert.equal(C.screens[5], 'pokemon');
+assert.equal(C.screens[4], 'pokemon');
 assert.notEqual(C.sourcesKey({sources:{pokemon:{valid:false}}}),
                 C.sourcesKey({sources:{pokemon:{valid:true,fetched_at:1}}}));
-for(const count of [3,5]) {
+for(const count of [3,4,5]) {
  const old=C.clone(c); old.enabled=old.enabled.slice(0,count);old.order=old.order.slice(0,count);
  for(const key of C.screens.slice(count)) delete old.styles[key];
  old.fixed_screen='weather'; assert.deepEqual(C.validate(old),[]);
+}
+for (const count of [5,6]) {
+ for (const airOnly of [false,true]) {
+  const old=C.clone(c);
+  old.order=['weather','feed','note','sky','air','pokemon'].slice(0,count).reverse();
+  old.enabled=Array.from({length:count},(_,i)=>i===4 || (!airOnly && i===5));
+  old.styles.air='atlas'; old.air_main='pm25';
+  if(count===5) delete old.styles.pokemon;
+  old.fixed_screen='air'; old.day[0].screen='air';
+  assert.deepEqual(C.validate(old),[]);
+  const migrated=C.safeRecipe(old);
+  assert(!migrated.order.includes('air'));
+  assert(!('air_main' in migrated));
+  assert.equal(migrated.fixed_screen,'weather');
+  assert.equal(migrated.day[0].screen,'weather');
+  assert.equal(migrated.enabled[0],count===5 || airOnly);
+  if(count===6) assert.equal(migrated.enabled[4],!airOnly);
+ }
 }
 ''', ROOT/'firmware/ui/core.js', work/'config.json')
         def check(name, data, valid=True):
@@ -156,7 +185,7 @@ for(const count of [3,5]) {
             pixels=b''.join(bytes(palette[(v>>shift)&3]) for v in frame.read_bytes() for shift in (6,4,2,0))
             rows=b''.join(b'\0'+pixels[y*1200:(y+1)*1200] for y in range(300))
             frame.with_suffix('.png').write_bytes(png(400,300,8,2,rows))
-        print('PASS: config migration, scheduling, UI validation, JSON parsing, PNG filters/bounds/CRC and rendering')
+        print('PASS: screen migration, scheduling, UI validation, AQI parsing/colors, JSON parsing, PNG filters/bounds/CRC and rendering')
         if args.output_dir: print('Previews:',out)
 
 if __name__ == '__main__':

@@ -5,9 +5,8 @@
 #include <stddef.h>
 
 #define HOME_SCHEMA 1
-/* Six screens. Older three/five-screen settings remain readable; new screens
- * are appended to the order and disabled until explicitly enabled. */
-#define HOME_SCREEN_COUNT 6
+/* Five screens; legacy Air settings are migrated during JSON decoding. */
+#define HOME_SCREEN_COUNT 5
 /* Moments of the "Day rhythm", not screens: three, as in every version so far. */
 #define HOME_DAY_SLOTS 3
 #define HOME_FRAME_BYTES 30000
@@ -18,8 +17,7 @@ typedef enum {
     HOME_FEED = 1,
     HOME_NOTE = 2,
     HOME_SKY = 3,
-    HOME_AIR = 4,
-    HOME_POKEMON = 5
+    HOME_POKEMON = 4
 } home_screen_t;
 typedef enum { HOME_FIXED=0, HOME_DAY=1, HOME_ROTATE=2 } home_mode_t;
 /* HOME_CYCLE is stored in the config only; drawing always gets one of the first three. */
@@ -47,7 +45,6 @@ typedef struct {
     uint16_t interval_min, pause_min;
     uint16_t cycle_min; /* "In turn": minutes per composition while a screen stays */
     uint8_t ok_action;  /* short OK/BOOT: 0 the "emini" card, 1 refresh, 2 hold, 3 setup window */
-    uint8_t air_main;   /* Air: headline number, 0 European index, 1 US AQI, 2 PM2.5 */
     uint8_t brush;      /* tone structure (D-HOME-CC-23/25): 0 grain, 1 halftone, 2 grid */
     bool quiet_enabled;
     uint16_t quiet_start, quiet_end;
@@ -89,28 +86,11 @@ typedef struct {
     char url[HOME_FEED_URL_BYTES];
     int64_t published_at;
 } home_feed_t;
-/* Open-Meteo Air Quality. Index 0 is the last full hour at or before now and is
- * never more than one hour behind it; up to 24 hours are kept from there. An
- * absent series, a JSON null and a physically impossible number all yield NAN
- * (-1 for the integer indices). Pollen is null outside Europe, so pollen[] is
- * NAN there. meta.issued_at is the hour of index 0: the response carries no
- * model issue time of its own. Parser and levels: home_air.h. */
-#define HOME_AIR_HOURS 24
-#define HOME_POLLEN_COUNT 4
-enum {
-    HOME_POLLEN_ALDER = 0,
-    HOME_POLLEN_BIRCH = 1,
-    HOME_POLLEN_GRASS = 2,
-    HOME_POLLEN_MUGWORT = 3
-};
+/* Weather's compact US AQI cache. */
 typedef struct {
     home_source_meta_t meta;
-    int64_t forecast_at; /* UTC full hour of index 0 */
-    double hourly_pm2_5[HOME_AIR_HOURS], hourly_uv[HOME_AIR_HOURS]; /* NAN when absent */
-    uint8_t hourly_count;
-    double pm2_5, pm10, uv_index; /* hour of index 0 */
-    int16_t european_aqi, us_aqi; /* -1 when absent */
-    double pollen[HOME_POLLEN_COUNT]; /* alder, birch, grass, mugwort */
+    int64_t forecast_at;
+    int16_t us_aqi; /* -1 when absent */
 } home_air_t;
 #define HOME_POKEMON_SPRITE_VERSION 2
 #define HOME_POKEMON_SIDE 96

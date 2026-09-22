@@ -558,15 +558,14 @@ void home_sources_task(void *unused)
             }
             home_unlock();
         }
-        /* Weather also displays US AQI. Reuse the air source for either screen. */
-        if ((c->enabled[HOME_AIR] || c->enabled[HOME_WEATHER]) && c->location_ready &&
+        /* Weather uses the compact US AQI source. */
+        if (c->enabled[HOME_WEATHER] && c->location_ready &&
             now >= d->air.meta.next_fetch) {
             home_fetch_air(c, &d->air, now);
             home_lock();
             if (home_runtime.config.latitude == c->latitude &&
                 home_runtime.config.longitude == c->longitude &&
-                (home_runtime.config.enabled[HOME_AIR] ||
-                 home_runtime.config.enabled[HOME_WEATHER])) {
+                home_runtime.config.enabled[HOME_WEATHER]) {
                 home_runtime.data.air = d->air;
                 home_runtime.counters.fetches++;
                 home_runtime.refresh_requested &= ~4U;

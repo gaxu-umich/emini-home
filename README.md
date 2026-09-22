@@ -26,33 +26,35 @@ server sits in between.
 
 ## Today and the next seven days
 
-<p align="center"><img src="docs/images/epaper-weather-week.png" width="400" alt="Weather: large current temperature and condition above seven daily forecast columns"></p>
+<p align="center"><img src="docs/images/epaper-weather-week.png" width="400" alt="Weather: current temperature, high/low and US AQI above seven daily forecast columns"></p>
 
 Weather uses a single layout inspired by the supplied Paperwake reference:
 current conditions, today's forecast high and low, and tomorrow through the
 following seven days. Home and the saved location remain at the top; the date
 and update status remain at the bottom. Daily ranges are estimates from the
 available forecast samples, so today's range covers the remaining forecast,
-not temperatures already observed. Missing days show a dash.
+not temperatures already observed. Missing days show a dash. US AQI appears below
+the high/low in the same font size: black through 50, yellow from 51 to 100,
+and red above 100. Missing AQI shows a dash.
 
 News now shows the feed's summary or description below the headline, without
 the decorative colour bar. Feeds without a summary keep the headline view.
 See [weather and news details](docs/WEATHER_NEWS.md).
 
-## Sky and Air
+## Sky
 
-Two more screens arrived in 0.5.0, both switched off until you enable them in the panel.
 **Sky** shows sunrise, sunset, the length of the day and the Moon's phase, worked out on the
-device from your saved location; nothing is downloaded for it. **Air** shows the European
-air quality index, PM2.5 over the next 24 hours, the UV index with a sunscreen hint and,
-in Europe, four pollens, from Open-Meteo's Air Quality service (CC BY 4.0). Each has the
-Print, Rhythm and Atlas compositions.
+device from your saved location; nothing is downloaded for it. Enable it in the panel
+and choose the Print, Rhythm or Atlas composition.
 
 <p align="center">
-  <img src="docs/images/epaper-sky-print.png" width="400" alt="The Sky screen in the Print composition: the sunset time in large type, the length of the day, a warm dome with the sun in its current position and a strip of the whole day from night through dawn, day and dusk">
-  <img src="docs/images/epaper-air-print.png" width="400" alt="The Air screen in the Print composition: the European air quality index in large type, the word Good, 24 hourly bars on a warm scale, a UV sun, the UV line and four pollen tiles">
+  <img src="docs/images/epaper-sky-print.png" width="400" alt="The Sky screen: sunset time, day length and the sun's current position">
 </p>
-<p align="center"><sub>Sky (Warsaw, equinox) and Air (Berlin, May), drawn from sample data by the 0.5.0 renderer</sub></p>
+<p align="center"><sub>Sky (Warsaw, equinox), drawn from sample data</sub></p>
+
+The standalone Air screen has been removed. Weather retains US AQI from Open-Meteo;
+UV, pollen and PM2.5 charts are no longer fetched or stored. Existing settings are
+migrated, with old Air selections falling back to Weather.
 
 ## Pokémon of the day (local development build)
 
@@ -85,7 +87,7 @@ Headlines and notes in Simplified Chinese are drawn with Noto Sans CJK glyphs
 (the whole of GB 2312, 6 763 characters, plus punctuation); lines break between
 characters, so a Chinese feed such as a news site's RSS works as it is. Since
 0.5.1 the screens themselves speak Simplified Chinese too: every label, footer
-and sentence, the date as 9月15日, and air quality, UV and pollen by name.
+and sentence, and the date as 9月15日.
 Choose the language in the phone panel, or hold the lower side button for five
 seconds on the device.
 
@@ -158,9 +160,9 @@ helps the next person decide.
 ## Privacy
 
 Home talks to MET Norway for weather, to the news feed you choose, to FreeIPAPI
-for an approximate location and to public time servers. While the Air screen is
+for an approximate location and to public time servers. While Weather is
 switched on, it also sends the saved coordinates to the Open-Meteo Air Quality
-API for air quality, UV and pollen. When you search for a town, your phone's
+API for US AQI. When you search for a town, your phone's
 browser sends the search to Open-Meteo. Each of these services sees an ordinary
 request from your internet address. Nothing goes to emini, and the firmware has
 no analytics. The panel runs over HTTP on your local network and settings are

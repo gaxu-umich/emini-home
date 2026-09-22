@@ -90,3 +90,9 @@ Pokémon names, artwork and game text belong to their respective rights holders;
 the repository's MIT license does not relicense that content. This project is
 not affiliated with or endorsed by Pokémon, Nintendo, Game Freak or Creatures.
 No Pokémon artwork is embedded in the firmware or committed as a test fixture.
+
+### Weather US AQI
+
+Weather displays US AQI supplied by the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api),
+licensed under CC BY 4.0. The device selects the current hourly value for the saved
+location; UV, pollen and PM2.5 series are not requested.

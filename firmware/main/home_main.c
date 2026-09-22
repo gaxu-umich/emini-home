@@ -129,8 +129,6 @@ static bool screen_has_data(int s)
         return c->location_ready; /* computed on the device, nothing to download */
     case HOME_POKEMON:
         return d->pokemon.meta.valid;
-    case HOME_AIR:
-        return c->location_ready && d->air.meta.valid;
     default:
         return false;
     }
@@ -200,8 +198,7 @@ static void refresh_action(void)
         home_runtime.refresh_requested |= 1U;
         if (home_runtime.config.feed_url[0])
             home_runtime.refresh_requested |= 2U;
-        if ((home_runtime.config.enabled[HOME_AIR] ||
-             home_runtime.config.enabled[HOME_WEATHER]) && home_runtime.config.location_ready)
+        if (home_runtime.config.enabled[HOME_WEATHER] && home_runtime.config.location_ready)
             home_runtime.refresh_requested |= 4U;
         /* The fresh data belongs on the screen the reader is looking at, and the reader has
          * to see that the press did something even when the provider answers "not modified"
@@ -239,8 +236,7 @@ static void action(int key)
             home_runtime.refresh_requested |= 1U;
             if (home_runtime.config.feed_url[0])
                 home_runtime.refresh_requested |= 2U;
-            if ((home_runtime.config.enabled[HOME_AIR] ||
-             home_runtime.config.enabled[HOME_WEATHER]) && home_runtime.config.location_ready)
+            if (home_runtime.config.enabled[HOME_WEATHER] && home_runtime.config.location_ready)
                 home_runtime.refresh_requested |= 4U;
             pause = false;
         } else if (what == 2) { /* hold the current screen, or resume when already held */

@@ -68,7 +68,7 @@ static const cJSON *member(const cJSON *object, const char *key)
 {
     return cJSON_IsObject(object) ? cJSON_GetObjectItemCaseSensitive(object, key) : NULL;
 }
-/* cJSON keeps the first of two equal keys, so a second "european_aqi" could hide
+/* cJSON keeps the first of two equal keys, so a second "us_aqi" could hide
  * behind the one we read. Refuse duplicates, nameless members and absurd counts. */
 static bool unique_members(const cJSON *object)
 {
@@ -137,17 +137,6 @@ static int64_t hour_time(const cJSON *node)
     return home_parse_time(text);
 }
 
-int home_air_level(int european_aqi)
-{
-    if (european_aqi < 0)
-        return -1;
-    static const int bands[] = {20, 40, 60, 80, 100};
-    for (int i = 0; i < 5; ++i)
-        if (european_aqi <= bands[i])
-            return i;
-    return 5;
-}
-
 bool home_parse_air(const char *json, size_t len, home_air_t *out, int64_t now, char error[97])
 {
     if (!out || now <= 0 || now > INT64_C(253402300799) || !valid_body(json, len))
@@ -161,12 +150,7 @@ bool home_parse_air(const char *json, size_t len, home_air_t *out, int64_t now, 
     bool ok = false;
     const char *reason = "Invalid air schema";
     home_air_t parsed = {0};
-    parsed.pm2_5 = parsed.pm10 = parsed.uv_index = NAN;
-    parsed.european_aqi = parsed.us_aqi = -1;
-    for (unsigned i = 0; i < HOME_AIR_HOURS; ++i)
-        parsed.hourly_pm2_5[i] = parsed.hourly_uv[i] = NAN;
-    for (unsigned i = 0; i < HOME_POLLEN_COUNT; ++i)
-        parsed.pollen[i] = NAN;
+    parsed.us_aqi = -1;
     const cJSON *hourly = member(root, "hourly"), *times = member(hourly, "time");
     const cJSON *offset = member(root, "utc_offset_seconds");
     int count = cJSON_GetArraySize(times);
@@ -178,21 +162,12 @@ bool home_parse_air(const char *json, size_t len, home_air_t *out, int64_t now, 
         reason = "Air response is not in UTC";
         goto done;
     }
-    if (!member(hourly, "european_aqi")) {
-        reason = "Air response has no european_aqi series";
+    if (!member(hourly, "us_aqi")) {
+        reason = "Air response has no us_aqi series";
         goto done;
     }
     bool shape = true;
-    const cJSON *pm2_5 = series(hourly, "pm2_5", count, &shape);
-    const cJSON *pm10 = series(hourly, "pm10", count, &shape);
-    const cJSON *european = series(hourly, "european_aqi", count, &shape);
     const cJSON *american = series(hourly, "us_aqi", count, &shape);
-    const cJSON *uv = series(hourly, "uv_index", count, &shape);
-    const cJSON *pollen[HOME_POLLEN_COUNT];
-    static const char *const pollen_keys[HOME_POLLEN_COUNT] = {"alder_pollen", "birch_pollen",
-                                                               "grass_pollen", "mugwort_pollen"};
-    for (unsigned i = 0; i < HOME_POLLEN_COUNT; ++i)
-        pollen[i] = series(hourly, pollen_keys[i], count, &shape);
     if (!shape) {
         reason = "Air series has the wrong type or length";
         goto done;
@@ -219,30 +194,11 @@ bool home_parse_air(const char *json, size_t len, home_air_t *out, int64_t now, 
         reason = "Air forecast has expired";
         goto done;
     }
-    int hours = count - index;
-    if (hours > HOME_AIR_HOURS)
-        hours = HOME_AIR_HOURS;
-    for (int i = 0; i < hours; ++i)
-        if (!sample(pm2_5, index + i, 0, 2000, &parsed.hourly_pm2_5[i]) ||
-            !sample(uv, index + i, 0, 20, &parsed.hourly_uv[i])) {
-            reason = "Air value is not a number";
-            goto done;
-        }
-    if (!sample(pm10, index, 0, 2000, &parsed.pm10) ||
-        !index_sample(european, index, &parsed.european_aqi) ||
-        !index_sample(american, index, &parsed.us_aqi)) {
+    if (!index_sample(american, index, &parsed.us_aqi)) {
         reason = "Air value is not a number";
         goto done;
     }
-    for (unsigned i = 0; i < HOME_POLLEN_COUNT; ++i)
-        if (!sample(pollen[i], index, 0, 10000, &parsed.pollen[i])) {
-            reason = "Air value is not a number";
-            goto done;
-        }
     parsed.forecast_at = selected;
-    parsed.hourly_count = (uint8_t)hours;
-    parsed.pm2_5 = parsed.hourly_pm2_5[0];
-    parsed.uv_index = parsed.hourly_uv[0];
     parsed.meta.valid = true;
     parsed.meta.issued_at = selected;
     *out = parsed;

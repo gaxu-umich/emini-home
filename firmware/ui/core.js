@@ -33,9 +33,9 @@
   }
   const boot = createBootGuard(root);
   if (boot) root.HomeBoot = boot;
-  // Additional screens start disabled; older three/five-screen recipes still work.
+  // Additional screens start disabled; legacy Air recipes are migrated.
   // Settings and recipes written before 0.5.0 list only the first three (LEGACY).
-  const screens = ["weather", "feed", "note", "sky", "air", "pokemon"];
+  const screens = ["weather", "feed", "note", "sky", "pokemon"];
   const LEGACY = 3;
   // "cycle" = Print, Rhythm and Atlas take turns (D-HOME-CC-18). Previews never send it.
   const styles = ["print", "rhythm", "atlas", "cycle"];
@@ -72,7 +72,6 @@
     "pause_min",
     "cycle_min",
     "ok_action",
-    "air_main",
     "brush",
     "day",
     "quiet",
@@ -488,7 +487,31 @@
     }
     return rgba;
   }
+  function migrateScreens(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+    const c = clone(raw);
+    if (Array.isArray(c.order) && c.order.includes("air") &&
+        [5, 6].includes(c.order.length) && Array.isArray(c.enabled) &&
+        c.enabled.length === c.order.length &&
+        c.enabled.every((v) => typeof v === "boolean") &&
+        new Set(c.order).size === c.order.length &&
+        c.order.every((s) => ["weather", "feed", "note", "sky", "air", "pokemon"]
+          .slice(0, c.order.length).includes(s))) {
+      const airEnabled = c.enabled[4];
+      c.enabled.splice(4, 1);
+      c.order = c.order.filter((s) => s !== "air");
+      if (airEnabled && !c.enabled.some(Boolean)) c.enabled[0] = true;
+    }
+    if (c.styles) delete c.styles.air;
+    if (c.fixed_screen === "air") c.fixed_screen = "weather";
+    if (Array.isArray(c.day))
+      for (const slot of c.day)
+        if (slot && slot.screen === "air") slot.screen = "weather";
+    delete c.air_main;
+    return c;
+  }
   function validate(c, recipe = false) {
+    c = migrateScreens(c);
     const errors = [];
     const has = (k) => Object.prototype.hasOwnProperty.call(c, k);
     const check = (k, ok) => {
@@ -552,12 +575,6 @@
         ["info", "refresh", "hold", "setup"].includes(c.ok_action),
     );
     check(
-      "air_main",
-      (recipe && !has("air_main")) ||
-        c.air_main === undefined ||
-        ["eu", "us", "pm25"].includes(c.air_main),
-    );
-    check(
       "brush",
       (recipe && !has("brush")) ||
         c.brush === undefined ||
@@ -587,10 +604,10 @@
         c.interval_min >= 5 &&
         c.interval_min <= 1440,
     );
-    // Same shapes as home_config.c: three, five or all six screens.
+    // Same migrated shapes as home_config.c: three, four or five screens.
     const listed = (x) =>
       Array.isArray(x) &&
-      (x.length === LEGACY || x.length === 5 || x.length === screens.length);
+      (x.length === LEGACY || x.length === 4 || x.length === screens.length);
     check(
       "enabled",
       listed(c.enabled) &&
@@ -601,7 +618,8 @@
       "order",
       listed(c.order) &&
         new Set(c.order).size === c.order.length &&
-        c.order.every((s) => screens.includes(s)),
+        c.order.length === c.enabled?.length &&
+        c.order.every((s) => screens.slice(0, c.order.length).includes(s)),
     );
     check(
       "styles",
@@ -644,6 +662,7 @@
       raw.schema !== 1
     )
       throw new Error("recipe_schema");
+    raw = migrateScreens(raw);
     const out = { schema: 1 };
     for (const k of recipeKeys) {
       if (!Object.prototype.hasOwnProperty.call(raw, k)) {
@@ -651,7 +670,6 @@
         if (
           k === "cycle_min" ||
           k === "ok_action" ||
-          k === "air_main" ||
           k === "brush"
         )
           continue;

@@ -1,5 +1,6 @@
 #include "home_parse.h"
 #include "home_config.h"
+#include "home_air.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -31,6 +32,28 @@ static void save_frame(const char *dir, const char *name, home_config_t *c, home
 }
 int home_screens_test(const char *weather_file, const char *outdir)
 {
+    const char *aqi_json = "{\"utc_offset_seconds\":0,\"hourly\":{\"time\":[\"2026-09-22T00:00\",\"2026-09-22T01:00\"],\"us_aqi\":[51,null]}}";
+    home_air_t air = {0};
+    char aqi_error[97];
+    int64_t aqi_now = home_parse_time("2026-09-22T00:30:00Z");
+    assert(home_parse_air(aqi_json, strlen(aqi_json), &air, aqi_now, aqi_error));
+    assert(air.meta.valid && air.us_aqi == 51 && air.forecast_at == aqi_now - 1800);
+    assert(home_parse_air(aqi_json, strlen(aqi_json), &air, aqi_now + 3600, aqi_error));
+    assert(air.us_aqi == -1);
+    assert(!home_parse_air(aqi_json, strlen(aqi_json), &air, aqi_now + 7200, aqi_error));
+    assert(!home_parse_air(aqi_json, strlen(aqi_json), &air, aqi_now - 3600, aqi_error));
+    const char *invalid_aqi[] = {
+        "{\"hourly\":{\"time\":[\"2026-09-22T00:00\"],\"european_aqi\":[20]}}",
+        "{\"hourly\":{\"time\":[\"2026-09-22T00:00\"],\"us_aqi\":[\"51\"]}}",
+        "{\"hourly\":{\"time\":[\"2026-09-22T00:00\"],\"us_aqi\":[]}}",
+        "{\"utc_offset_seconds\":3600,\"hourly\":{\"time\":[\"2026-09-22T00:00\"],\"us_aqi\":[51]}}",
+        "{\"hourly\":{\"time\":[\"2026-09-22T00:00\",\"2026-09-22T02:00\"],\"us_aqi\":[51,60]}}"
+    };
+    for (size_t i = 0; i < sizeof invalid_aqi / sizeof invalid_aqi[0]; i++) {
+        air.us_aqi = 42;
+        assert(!home_parse_air(invalid_aqi[i], strlen(invalid_aqi[i]), &air, aqi_now, aqi_error));
+        assert(air.us_aqi == 42); /* errors preserve the last good cache */
+    }
     summary_test(
         "<rss><channel><title>News</title><item><title>Headline</title><description><![CDATA[<p>First <b>paragraph</b> &amp; more.</p><script>hidden</script><p>Next.</p>]]></description></item></channel></rss>",
         "First paragraph & more. Next.");

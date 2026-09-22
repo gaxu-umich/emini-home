@@ -133,8 +133,8 @@ esp_err_t home_store_init(home_config_t *c, home_data_t *d, home_secrets_t *s)
     if (p) {
         /* A record written by another firmware has another cache_t size and is
          * skipped whole; *d was cleared above, so every source starts empty
-         * rather than reading a field at the wrong offset. Adding Air in 0.5.0
-         * changes the size, so 0.4.x caches are dropped once, on first boot. */
+         * rather than reading a field at the wrong offset. The compact AQI cache
+         * changes the size, so older source caches are dropped once on upgrade. */
         if (size == sizeof(cache_t)) {
             cache_t *cache = p;
             cache->feed_url[HOME_FEED_URL_BYTES - 1] = 0;
