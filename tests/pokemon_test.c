@@ -71,9 +71,14 @@ static void settings(void)
     free(json);
     cJSON_Delete(j);
 }
+int home_screens_test(const char *, const char *);
 int main(int argc, char **argv)
 {
     assert(argc >= 2);
+    if (!strcmp(argv[1], "screens")) {
+        assert(argc == 4);
+        return home_screens_test(argv[2], argv[3]);
+    }
     if (!strcmp(argv[1], "settings")) {
         settings();
         return 0;

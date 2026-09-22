@@ -963,6 +963,8 @@
     if (!url) return;
     holder.querySelector("[data-story-title]").textContent =
       typeof item.title === "string" ? item.title : "";
+    holder.querySelector("[data-story-summary]").textContent =
+      typeof item.summary === "string" ? item.summary : "";
     const source = typeof item.source === "string" ? item.source : "";
     const published =
       Number.isFinite(item.published_at) && item.published_at > 0
@@ -1015,7 +1017,7 @@
       position = S.draft.order.indexOf(s),
       last =
         S.draft.enabled.filter(Boolean).length === 1 && S.draft.enabled[index];
-    return `<section class="editor-page">${backButton()}<div class="page-title"><span class="title-icon">${icon(s)}</span><div><h1>${t(s)}</h1><p>${t(s + "Desc")}</p></div></div><div class="editor-layout"><section class="editor-fields"><div class="form-section"><h2>${say("What it says", "Co pokazuje")}</h2>${s === "feed" ? `<section id="selected-story" class="source-state" hidden><strong data-story-title></strong><p class="hint" data-story-source></p><a class="button-link" data-story-link target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${say("Read full story ↗", "Przeczytaj wiadomość ↗")}</a></section>` : ""}<div class="fields">${
+    return `<section class="editor-page">${backButton()}<div class="page-title"><span class="title-icon">${icon(s)}</span><div><h1>${t(s)}</h1><p>${t(s + "Desc")}</p></div></div><div class="editor-layout"><section class="editor-fields"><div class="form-section"><h2>${say("What it says", "Co pokazuje")}</h2>${s === "feed" ? `<section id="selected-story" class="source-state" hidden><strong data-story-title></strong><p data-story-summary></p><p class="hint" data-story-source></p><a class="button-link" data-story-link target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${say("Read full story ↗", "Przeczytaj wiadomość ↗")}</a></section>` : ""}<div class="fields">${
       s === "weather"
         ? weatherEditor()
         : s === "feed"
@@ -1041,7 +1043,7 @@
                     ],
                   )}`
                 : `<label class="field"><span>${t("noteText")}</span><textarea data-path="note" maxlength="240" rows="5" placeholder="${say("What matters today?", "Co jest dziś ważne?")}">${esc(S.draft.note)}</textarea><small>${t("noteHelp")}<span id="note-count">${noteSpace(S.draft.note)}</span><progress id="note-meter" max="100" value="${Math.min(100, C.noteUsage(S.draft.note).percent)}" aria-label="${esc(noteSpace(S.draft.note))}"></progress></small></label>`
-    }</div></div><div class="form-section"><h2>${say("How it looks", "Jak wygląda")}</h2><div class="fields">${select(
+    }</div></div><div class="form-section"><h2>${say("How it looks", "Jak wygląda")}</h2><div class="fields">${s === "weather" ? `<p class="hint">${say("Today and the next seven days, in one view.", "Dzisiaj i kolejne siedem dni w jednym widoku.")}</p>` : select(
       "styles." + s,
       "layout",
       [
@@ -1050,7 +1052,7 @@
         ["atlas", t("atlas")],
         ["cycle", t("cycleStyle")],
       ],
-    )}${styleHints(s)}<button class="setting-link" data-action="appearance-settings">${icon("palette")}<span>${say("Texture, colour and larger text", "Faktura, kolor i większy tekst")}</span>${icon("arrow")}</button></div></div><div class="form-section"><h2>${say("In your collection", "W Twojej kolekcji")}</h2><label class="check"><span>${t("enabled")}</span><input type="checkbox" data-path="enabled.${index}" ${S.draft.enabled[index] ? "checked" : ""} ${last ? "disabled" : ""}></label>${last ? `<p class="hint">${say("Keep at least one screen enabled.", "Co najmniej jeden ekran musi pozostać aktywny.")}</p>` : ""}<div class="order-control"><button data-action="move" data-direction="-1" ${position === 0 ? "disabled" : ""}>↑ ${t("earlier")}</button><span>${position + 1} / ${C.screens.length}</span><button data-action="move" data-direction="1" ${position === C.screens.length - 1 ? "disabled" : ""}>↓ ${t("later")}</button></div></div></section><aside class="editor-aside"><section class="edit-preview"><div class="preview-title"><h2 id="preview-heading">${t("savedPreview")}</h2><button class="icon-label-button" data-action="native-preview" data-kind="draft">${icon("screens")}<span>1:1</span></button></div><canvas data-screen="${s}" width="400" height="300" role="img" aria-label="${esc(t("savedPreview"))}" ${!S.frames[s] ? "hidden" : ""}></canvas><p class="hint" id="preview-missing" ${S.frames[s] ? "hidden" : ""}>${t("previewMissing")}</p><p class="hint" id="draft-preview" ${!S.dirty ? "hidden" : ""}>${t("draftPreview")}</p><p class="hint">${t("photoHint")}</p></section><div id="source-holder">${sourceBlock(s)}</div></aside></div></section>`;
+    )}${s === "weather" ? "" : styleHints(s)}<button class="setting-link" data-action="appearance-settings">${icon("palette")}<span>${say("Texture, colour and larger text", "Faktura, kolor i większy tekst")}</span>${icon("arrow")}</button></div></div><div class="form-section"><h2>${say("In your collection", "W Twojej kolekcji")}</h2><label class="check"><span>${t("enabled")}</span><input type="checkbox" data-path="enabled.${index}" ${S.draft.enabled[index] ? "checked" : ""} ${last ? "disabled" : ""}></label>${last ? `<p class="hint">${say("Keep at least one screen enabled.", "Co najmniej jeden ekran musi pozostać aktywny.")}</p>` : ""}<div class="order-control"><button data-action="move" data-direction="-1" ${position === 0 ? "disabled" : ""}>↑ ${t("earlier")}</button><span>${position + 1} / ${C.screens.length}</span><button data-action="move" data-direction="1" ${position === C.screens.length - 1 ? "disabled" : ""}>↓ ${t("later")}</button></div></div></section><aside class="editor-aside"><section class="edit-preview"><div class="preview-title"><h2 id="preview-heading">${t("savedPreview")}</h2><button class="icon-label-button" data-action="native-preview" data-kind="draft">${icon("screens")}<span>1:1</span></button></div><canvas data-screen="${s}" width="400" height="300" role="img" aria-label="${esc(t("savedPreview"))}" ${!S.frames[s] ? "hidden" : ""}></canvas><p class="hint" id="preview-missing" ${S.frames[s] ? "hidden" : ""}>${t("previewMissing")}</p><p class="hint" id="draft-preview" ${!S.dirty ? "hidden" : ""}>${t("draftPreview")}</p><p class="hint">${t("photoHint")}</p></section><div id="source-holder">${sourceBlock(s)}</div></aside></div></section>`;
   }
   function settingsMenu() {
     const rows = [

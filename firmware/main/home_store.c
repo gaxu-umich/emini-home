@@ -15,6 +15,7 @@ typedef struct {
 } record_t;
 typedef struct {
     double latitude, longitude;
+    char timezone[49];
     char feed_url[HOME_FEED_URL_BYTES];
     home_data_t data;
 } cache_t;
@@ -137,7 +138,8 @@ esp_err_t home_store_init(home_config_t *c, home_data_t *d, home_secrets_t *s)
         if (size == sizeof(cache_t)) {
             cache_t *cache = p;
             cache->feed_url[HOME_FEED_URL_BYTES - 1] = 0;
-            if (cache->latitude == c->latitude && cache->longitude == c->longitude) {
+            if (cache->latitude == c->latitude && cache->longitude == c->longitude &&
+                !strncmp(cache->timezone, c->timezone, sizeof cache->timezone)) {
                 d->weather = cache->data.weather;
                 d->air = cache->data.air;
             }
@@ -176,6 +178,7 @@ esp_err_t home_store_init(home_config_t *c, home_data_t *d, home_secrets_t *s)
     d->pokemon.genus[64] = 0;
     d->pokemon.introduction[512] = 0;
     d->feed.title[256] = 0;
+    d->feed.summary[512] = 0;
     d->feed.source[96] = 0;
     d->feed.url[512] = 0;
     return ESP_OK;
@@ -198,6 +201,7 @@ esp_err_t home_store_data(const home_data_t *d, const home_config_t *c)
     cache_t *p = calloc(1, sizeof(*p));
     if (!p)
         return ESP_ERR_NO_MEM;
+    snprintf(p->timezone, sizeof p->timezone, "%s", c->timezone);
     p->latitude = c->latitude;
     p->longitude = c->longitude;
     snprintf(p->feed_url, sizeof(p->feed_url), "%s", c->feed_url);

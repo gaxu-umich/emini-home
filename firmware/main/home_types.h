@@ -65,8 +65,16 @@ typedef struct {
     char etag[129];
     char last_modified[65];
 } home_source_meta_t;
+#define HOME_WEATHER_DAYS 8 /* today plus the next seven local dates */
+typedef struct {
+    int32_t date; /* YYYYMMDD in the configured time zone */
+    double low, high;
+    char symbol[49]; /* representative interval nearest local noon */
+    bool valid;
+} home_weather_day_t;
 typedef struct {
     home_source_meta_t meta;
+    home_weather_day_t days[HOME_WEATHER_DAYS];
     int64_t forecast_at; /* validity time of temperature/hourly[0], separate from model issue */
     double temperature, low, high, precipitation, wind_speed, cloud_cover;
     char symbol[49];
@@ -76,6 +84,7 @@ typedef struct {
 typedef struct {
     home_source_meta_t meta;
     char title[257];
+    char summary[513];
     char source[97];
     char url[HOME_FEED_URL_BYTES];
     int64_t published_at;

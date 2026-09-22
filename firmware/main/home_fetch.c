@@ -985,7 +985,7 @@ esp_err_t home_fetch_weather(const home_config_t *c, home_weather_t *w, int64_t 
     }
     char error[97] = "Weather connection failed";
     home_weather_t candidate;
-    if (e == ESP_OK && !home_parse_weather(body, size, &candidate, now, error))
+    if (e == ESP_OK && !home_parse_weather_zone(body, size, &candidate, now, c->timezone, error))
         e = ESP_FAIL;
     free(body);
     if (e == ESP_OK) {

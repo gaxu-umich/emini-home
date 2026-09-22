@@ -87,8 +87,8 @@ Tap a screen to open its page:
   the source's cache time has run out.
 - **What it says**: for Weather, the place (see below). For News, the feed
   address. For your note, the words.
-- **How it looks**: the **Composition** and a link to the texture, colour and
-  text size.
+- **How it looks**: the **Composition** (except Weather, which has a fixed
+  daily layout) and a link to the texture, colour and text size.
 - **In your collection**: include the screen in the rotation and change its
   order.
 
@@ -150,7 +150,9 @@ Turning the screen off stops subsequent downloads. See [Pokémon implementation]
 
 ### Compositions
 
-Every screen can be drawn as **Print**, **Rhythm** or **Atlas**. Choose
+Weather uses one fixed layout: today above the next seven days. Its saved
+composition setting is ignored, and it does not cycle compositions. Other
+screens can be drawn as **Print**, **Rhythm** or **Atlas**. Choose
 **In turn** to use all three: Home shows Print, then Rhythm, then Atlas, and
 moves to the next composition each time that screen comes back to the display.
 When the same screen stays on the display, the composition changes after each
@@ -158,7 +160,7 @@ interval, but not during quiet hours. Set it right under the composition
 choices: **Change composition every … minutes** (5 to 1440), separate from the
 Rhythm tab.
 
-<p align="center"><img src="images/panel-composition-cycle.webp" width="260" alt="How it looks on the Weather page: Composition set to In turn, a note that Print, Rhythm and Atlas take turns, and Change composition every … minutes set to 30"></p>
+Weather no longer offers the composition selector shown in older screenshots.
 
 ## 4. The Rhythm tab
 

@@ -8,6 +8,8 @@ The host adapter substitutes zlib for the ESP32 ROM's miniz inflate routine;
 PNG parsing, filtering, quantization and the production renderer run unchanged.
 """
 import argparse
+import datetime
+import math
 import json
 from pathlib import Path
 import os
@@ -46,7 +48,7 @@ static size_t tinfl_decompress_mem_to_mem(void *o,size_t n,const void *i,size_t 
     return uncompress(o,&size,i,m)==Z_OK ? (size_t)size : (size_t)-1;
 }
 ''')
-        sources = ['tests/pokemon_test.c', 'firmware/main/home_pokemon.c',
+        sources = ['tests/pokemon_test.c', 'tests/screens_test.c', 'firmware/main/home_pokemon.c',
                    'firmware/main/home_config.c', 'firmware/main/home_places.c',
                    'firmware/main/home_render.c', 'firmware/main/home_parse_air.c', 'firmware/main/home_parse.c',
                    'firmware/main/home_sky.c', 'firmware/main/generated/home_font.c',
@@ -61,6 +63,20 @@ static size_t tinfl_decompress_mem_to_mem(void *o,size_t n,const void *i,size_t 
             '-I'+str(ROOT/'firmware/components/home_qr'),
             *(ROOT/x for x in sources), '-lz', '-lm', '-o', exe)
         run(exe, 'settings', cwd=work)
+        begin=datetime.datetime(2026,9,22,tzinfo=datetime.timezone.utc)
+        series=[]
+        icons=['clearsky_day','cloudy','partlycloudy_day','rain','clearsky_day','snow','fair_day','cloudy']
+        for hour in list(range(48))+list(range(48,193,6)):
+            at=begin+datetime.timedelta(hours=hour)
+            details={'air_temperature':round(12+hour//24+5*math.sin((hour%24-6)*math.pi/12),1),
+                     'wind_speed':3,'cloud_area_fraction':25}
+            period='next_1_hours' if hour<48 else 'next_6_hours'
+            series.append({'time':at.isoformat().replace('+00:00','Z'),'data':{
+                'instant':{'details':details},period:{'summary':{'symbol_code':icons[min(hour//24,7)]},
+                'details':{'precipitation_amount':0}}}})
+        weather=work/'weather.json'
+        weather.write_text(json.dumps({'properties':{'meta':{'updated_at':begin.isoformat().replace('+00:00','Z')},'timeseries':series}}))
+        run(exe,'screens',weather,out)
         run('node', '-e', '''const assert=require('node:assert/strict');
 const C=require(process.argv[1]), c=require(process.argv[2]);
 assert.deepEqual(C.validate(c), []);
@@ -135,7 +151,7 @@ for(const count of [3,5]) {
         sprite=work/'sprite.png';sprite.write_bytes(valid)
         run(exe,'card',args.species.resolve() if args.species else fixture,
             args.sprite.resolve() if args.sprite else sprite,out)
-        for frame in out.glob('pokemon-*.frame'):
+        for frame in out.glob('*.frame'):
             palette=((26,26,22),(230,229,219),(247,173,1),(123,0,1))
             pixels=b''.join(bytes(palette[(v>>shift)&3]) for v in frame.read_bytes() for shift in (6,4,2,0))
             rows=b''.join(b'\0'+pixels[y*1200:(y+1)*1200] for y in range(300))

@@ -1,4 +1,5 @@
 #include "home_parse.h"
+#include "home_places.h"
 #include "cJSON.h"
 #include <ctype.h>
 #include <math.h>
@@ -326,8 +327,8 @@ static bool json_members(const cJSON *node, unsigned depth)
     return true;
 }
 
-bool home_parse_weather(const char *json, size_t len, home_weather_t *out, int64_t now,
-                        char error[97])
+bool home_parse_weather_zone(const char *json, size_t len, home_weather_t *out, int64_t now,
+                             const char *zone, char error[97])
 {
     if (!out || now <= 0 || now > INT64_C(253402300799) || !valid_body(json, len) ||
         !json_shape(json, len))
@@ -344,6 +345,24 @@ bool home_parse_weather(const char *json, size_t len, home_weather_t *out, int64
     parsed.low = parsed.high = parsed.precipitation = parsed.wind_speed = parsed.cloud_cover = NAN;
     for (unsigned i = 0; i < 12; ++i)
         parsed.hourly_temperature[i] = parsed.hourly_rain[i] = NAN;
+    struct tm local;
+    int noon_distance[HOME_WEATHER_DAYS];
+    if (!home_tz_localtime(zone, now, &local)) {
+        cJSON_Delete(root);
+        return fail(error, "Invalid weather time zone");
+    }
+    char daytext[40];
+    snprintf(daytext, sizeof daytext, "%04d-%02d-%02dT00:00:00Z", local.tm_year + 1900,
+             local.tm_mon + 1, local.tm_mday);
+    int64_t civil = home_parse_time(daytext);
+    for (int i = 0; i < HOME_WEATHER_DAYS; i++) {
+        time_t at = civil + i * 86400;
+        struct tm day;
+        gmtime_r(&at, &day);
+        parsed.days[i].date = (day.tm_year + 1900) * 10000 + (day.tm_mon + 1) * 100 + day.tm_mday;
+        parsed.days[i].low = parsed.days[i].high = NAN;
+        noon_distance[i] = 1441;
+    }
     const cJSON *properties = member(root, "properties"), *meta = member(properties, "meta");
     const cJSON *units = member(meta, "units"), *series = member(properties, "timeseries");
     parsed.meta.issued_at = home_parse_time(string_value(member(meta, "updated_at")));
@@ -364,6 +383,59 @@ bool home_parse_weather(const char *json, size_t len, home_weather_t *out, int64
             reason = "Invalid forecast time or temperature";
             goto done;
         }
+        struct tm day;
+        if (!home_tz_localtime(zone, at, &day)) {
+            reason = "Forecast date outside time zone range";
+            goto done;
+        }
+        int32_t key = (day.tm_year + 1900) * 10000 + (day.tm_mon + 1) * 100 + day.tm_mday;
+        for (int i = 0; i < HOME_WEATHER_DAYS; i++)
+            if (parsed.days[i].date == key) {
+                home_weather_day_t *d = &parsed.days[i];
+                if (!d->valid)
+                    d->low = d->high = temperature;
+                d->valid = true;
+                d->low = fmin(d->low, temperature);
+                d->high = fmax(d->high, temperature);
+                /* Include interval extrema only when the entire interval belongs
+             * to this local date. Longer-range data falls back to sampled highs/lows. */
+                const cJSON *data = member(point, "data"), *period = member(data, "next_6_hours");
+                struct tm interval_end;
+                if (home_tz_localtime(zone, at + 6 * 3600 - 1, &interval_end) &&
+                    interval_end.tm_year == day.tm_year && interval_end.tm_yday == day.tm_yday) {
+                    const cJSON *details = member(period, "details");
+                    double low, high;
+                    if (!metric(details, "air_temperature_min", -100, 70, false, &low) ||
+                        !metric(details, "air_temperature_max", -100, 70, false, &high) ||
+                        (isfinite(low) && isfinite(high) && low > high)) {
+                        reason = "Invalid daily extrema";
+                        goto done;
+                    }
+                    if (isfinite(low))
+                        d->low = fmin(d->low, low);
+                    if (isfinite(high))
+                        d->high = fmax(d->high, high);
+                }
+                const char *symbol = NULL;
+                const char *periods[] = {"next_1_hours", "next_6_hours", "next_12_hours"};
+                for (unsigned k = 0; k < 3 && !symbol; k++)
+                    symbol = string_value(
+                        member(member(member(data, periods[k]), "summary"), "symbol_code"));
+                int distance = abs(day.tm_hour * 60 + day.tm_min - 720);
+                if (symbol && *symbol && distance < noon_distance[i]) {
+                    if (strlen(symbol) >= sizeof d->symbol) {
+                        reason = "Invalid daily symbol";
+                        goto done;
+                    }
+                    for (const char *ch = symbol; *ch; ch++)
+                        if (!((*ch >= 'a' && *ch <= 'z') || digit(*ch) >= 0 || *ch == '_')) {
+                            reason = "Invalid daily symbol";
+                            goto done;
+                        }
+                    snprintf(d->symbol, sizeof d->symbol, "%s", symbol);
+                    noon_distance[i] = distance;
+                }
+            }
         previous = at;
         if (selected_time < 0 && at >= now) {
             if (at > now + 3600) {
@@ -430,6 +502,12 @@ done:
     return ok ? true : fail(error, reason);
 }
 
+bool home_parse_weather(const char *json, size_t len, home_weather_t *out, int64_t now,
+                        char error[97])
+{
+    return home_parse_weather_zone(json, len, out, now, "UTC", error);
+}
+
 /* Bounded XML pull scanner. It validates the whole document, including ignored
  * extensions, but only projects a small RSS2/Atom subset into application data.
  * No DTD/entity expansion, recursion, resource lookup, or HTML execution. */
@@ -441,7 +519,9 @@ typedef enum {
     FIELD_SOURCE,
     FIELD_URL,
     FIELD_PUBLISHED,
-    FIELD_UPDATED
+    FIELD_UPDATED,
+    FIELD_SUMMARY,
+    FIELD_CONTENT
 } field_kind_t;
 typedef struct {
     char prefix[33];
@@ -456,7 +536,8 @@ typedef struct {
 } xml_node_t;
 typedef struct {
     char title[1025], source[385], url[1025], published[129], updated[129];
-    bool title_seen, source_seen, published_seen, updated_seen;
+    char summary[2049], content[2049];
+    bool title_seen, source_seen, published_seen, updated_seen, summary_seen, content_seen;
 } feed_candidate_t;
 typedef struct {
     const char *body;
@@ -742,6 +823,9 @@ static void candidate_done(xml_parser_t *p)
     home_feed_t candidate = {0};
     plain_text(p->entry.title, candidate.title, sizeof candidate.title);
     plain_text(p->entry.source, candidate.source, sizeof candidate.source);
+    plain_text(p->entry.summary, candidate.summary, sizeof candidate.summary);
+    if (!candidate.summary[0])
+        plain_text(p->entry.content, candidate.summary, sizeof candidate.summary);
     char date[129], url[1025];
     plain_text(p->entry.published[0] ? p->entry.published : p->entry.updated, date, sizeof date);
     bool dated = date[0] != 0;
@@ -770,6 +854,8 @@ static char *field_buffer(xml_parser_t *p, field_kind_t field, size_t *capacity)
     switch (field) {
         FIELD_CASE(FIELD_FEED, feed_title);
         FIELD_CASE(FIELD_TITLE, entry.title);
+        FIELD_CASE(FIELD_SUMMARY, entry.summary);
+        FIELD_CASE(FIELD_CONTENT, entry.content);
         FIELD_CASE(FIELD_SOURCE, entry.source);
         FIELD_CASE(FIELD_URL, entry.url);
         FIELD_CASE(FIELD_PUBLISHED, entry.published);
@@ -835,6 +921,22 @@ static bool direct_field(xml_parser_t *p, xml_node_t *node, const char *type)
             if (p->atom && *type && strcmp(type, "text") && strcmp(type, "html") &&
                 strcmp(type, "xhtml"))
                 return false;
+        } else if ((!p->atom && !strcmp(name, "description")) ||
+                   (p->atom && !strcmp(name, "summary"))) {
+            if (p->entry.summary_seen)
+                return false;
+            p->entry.summary_seen = true;
+            node->field = FIELD_SUMMARY;
+            if (p->atom && *type && strcmp(type, "text") && strcmp(type, "html") &&
+                strcmp(type, "xhtml"))
+                node->skip = true;
+        } else if (p->atom && !strcmp(name, "content")) {
+            if (p->entry.content_seen)
+                return false;
+            p->entry.content_seen = true;
+            node->field = FIELD_CONTENT;
+            if (*type && strcmp(type, "text") && strcmp(type, "html") && strcmp(type, "xhtml"))
+                node->skip = true;
         } else if (!strcmp(name, "source") && !p->atom) {
             if (p->entry.source_seen)
                 return false;
@@ -870,6 +972,12 @@ static bool xml_close(xml_parser_t *p, const char *name)
         candidate_done(p);
         p->in_entry = false;
     }
+    xml_node_t *node = &p->nodes[p->depth - 1];
+    const char *tag = local_name(node->name);
+    if (!node->skip && (node->field == FIELD_SUMMARY || node->field == FIELD_CONTENT) &&
+        (!strcmp(tag, "p") || !strcmp(tag, "div") || !strcmp(tag, "br") || !strcmp(tag, "li")))
+        if (!xml_text(p, " ", 1, true))
+            return false;
     p->binding_count = p->nodes[p->depth - 1].namespace_mark;
     --p->depth;
     if (!p->depth)

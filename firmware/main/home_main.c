@@ -200,7 +200,8 @@ static void refresh_action(void)
         home_runtime.refresh_requested |= 1U;
         if (home_runtime.config.feed_url[0])
             home_runtime.refresh_requested |= 2U;
-        if (home_runtime.config.enabled[HOME_AIR] && home_runtime.config.location_ready)
+        if ((home_runtime.config.enabled[HOME_AIR] ||
+             home_runtime.config.enabled[HOME_WEATHER]) && home_runtime.config.location_ready)
             home_runtime.refresh_requested |= 4U;
         /* The fresh data belongs on the screen the reader is looking at, and the reader has
          * to see that the press did something even when the provider answers "not modified"
@@ -238,7 +239,8 @@ static void action(int key)
             home_runtime.refresh_requested |= 1U;
             if (home_runtime.config.feed_url[0])
                 home_runtime.refresh_requested |= 2U;
-            if (home_runtime.config.enabled[HOME_AIR] && home_runtime.config.location_ready)
+            if ((home_runtime.config.enabled[HOME_AIR] ||
+             home_runtime.config.enabled[HOME_WEATHER]) && home_runtime.config.location_ready)
                 home_runtime.refresh_requested |= 4U;
             pause = false;
         } else if (what == 2) { /* hold the current screen, or resume when already held */
@@ -260,7 +262,7 @@ static void action(int key)
         int step = key == 2 ? 1 : -1;
         int showing =
             shown >= 0 && cycle_showing[shown] ? (int)((cycle_showing[shown] - 1) % 3) : 0;
-        if (shown >= 0 && shown < HOME_SCREEN_COUNT && shown == current &&
+        if (shown >= 0 && shown < HOME_SCREEN_COUNT && shown == current && shown != HOME_WEATHER &&
             home_runtime.config.style[shown] == HOME_CYCLE && screen_has_data(shown) &&
             showing + step >= 0 && showing + step <= 2) {
             cycle_showing[shown] = (uint32_t)(showing + step + 1);
@@ -597,8 +599,8 @@ void app_main(void)
          * cycle_min while it stays on the display. The timer waits for valid time,
          * the manual pause and quiet hours. Choosing In turn for the screen on the
          * display starts the timer without redrawing (Save does not publish). */
-        bool cycle =
-            !setup && screen >= 0 && screen < HOME_SCREEN_COUNT && c->style[screen] == HOME_CYCLE;
+        bool cycle = !setup && screen != HOME_WEATHER && screen >= 0 &&
+                     screen < HOME_SCREEN_COUNT && c->style[screen] == HOME_CYCLE;
         if (cycle && screen == current && !cycle_at[screen]) {
             cycle_at[screen] = mono;
             cycle_showing[screen] = 1;

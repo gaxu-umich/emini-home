@@ -24,24 +24,20 @@ server sits in between.
 > from the tested one. It cannot tell a NOTE4 from a NOTE4C, and only the
 > four-colour NOTE4C is supported.
 
-## One forecast, three compositions
+## Today and the next seven days
 
-<p align="center">
-  <img src="docs/images/epaper-weather-rhythm.png" width="400" alt="Rhythm composition: a sample forecast for Lisbon with a dithered temperature curve for the next hours">
-  <img src="docs/images/epaper-weather-atlas.png" width="400" alt="Atlas composition: the same sample forecast with a large sun and cloud on the left half">
-</p>
-<p align="center"><sub>Rhythm and Atlas, drawn on a computer by the 0.5.0 renderer from sample data. The photo at the top shows Print.</sub></p>
+<p align="center"><img src="docs/images/epaper-weather-week.png" width="400" alt="Weather: large current temperature and condition above seven daily forecast columns"></p>
 
-Rhythm draws the coming hours as a curve, and Atlas gives the sky half of the
-page. Each screen can keep one composition, or use **In turn** and move on to
-the next one each time it comes back to the display. The weather screen shows
-the range for the next 24 hours under the temperature and a short line about precipitation,
-such as “Rain from 18:00”.
+Weather uses a single layout inspired by the supplied Paperwake reference:
+current conditions, today's forecast high and low, and tomorrow through the
+following seven days. Home and the saved location remain at the top; the date
+and update status remain at the bottom. Daily ranges are estimates from the
+available forecast samples, so today's range covers the remaining forecast,
+not temperatures already observed. Missing days show a dash.
 
-There is no grey on this display, so the renderer mixes the four pigments in
-ordered dither patterns to draw warmth, light and cloud. Coloured patterns are
-never finer than 2 pixels, while black and paper patterns can still use single
-pixels.
+News now shows the feed's summary or description below the headline, without
+the decorative colour bar. Feeds without a summary keep the headline view.
+See [weather and news details](docs/WEATHER_NEWS.md).
 
 ## Sky and Air
 
@@ -50,7 +46,7 @@ Two more screens arrived in 0.5.0, both switched off until you enable them in th
 device from your saved location; nothing is downloaded for it. **Air** shows the European
 air quality index, PM2.5 over the next 24 hours, the UV index with a sunscreen hint and,
 in Europe, four pollens, from Open-Meteo's Air Quality service (CC BY 4.0). Each has the
-same three compositions as the weather.
+Print, Rhythm and Atlas compositions.
 
 <p align="center">
   <img src="docs/images/epaper-sky-print.png" width="400" alt="The Sky screen in the Print composition: the sunset time in large type, the length of the day, a warm dome with the sun in its current position and a strip of the whole day from night through dawn, day and dusk">

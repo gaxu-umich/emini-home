@@ -534,7 +534,8 @@ void home_sources_task(void *unused)
             home_fetch_weather(c, &d->weather, now);
             home_lock();
             if (home_runtime.config.latitude == c->latitude &&
-                home_runtime.config.longitude == c->longitude) {
+                home_runtime.config.longitude == c->longitude &&
+                !strcmp(home_runtime.config.timezone, c->timezone)) {
                 home_runtime.data.weather = d->weather;
                 home_runtime.counters.fetches++;
                 home_runtime.refresh_requested &= ~1U;
@@ -557,14 +558,15 @@ void home_sources_task(void *unused)
             }
             home_unlock();
         }
-        /* Air only when its screen is on: a screen nobody shows must not send the
-         * coordinates anywhere. Same worker, so never two connections at once. */
-        if (c->enabled[HOME_AIR] && c->location_ready && now >= d->air.meta.next_fetch) {
+        /* Weather also displays US AQI. Reuse the air source for either screen. */
+        if ((c->enabled[HOME_AIR] || c->enabled[HOME_WEATHER]) && c->location_ready &&
+            now >= d->air.meta.next_fetch) {
             home_fetch_air(c, &d->air, now);
             home_lock();
             if (home_runtime.config.latitude == c->latitude &&
                 home_runtime.config.longitude == c->longitude &&
-                home_runtime.config.enabled[HOME_AIR]) {
+                (home_runtime.config.enabled[HOME_AIR] ||
+                 home_runtime.config.enabled[HOME_WEATHER])) {
                 home_runtime.data.air = d->air;
                 home_runtime.counters.fetches++;
                 home_runtime.refresh_requested &= ~4U;

@@ -13,6 +13,8 @@
  * HTTPS absolute links only; absent/relative/unsafe links produce an empty URL.
  * Returns Unix UTC seconds, or -1 for malformed/unsupported dates. */
 int64_t home_parse_time(const char *text);
+bool home_parse_weather_zone(const char *json, size_t len, home_weather_t *out, int64_t now,
+                             const char *zone, char error[97]);
 bool home_parse_weather(const char *json, size_t len, home_weather_t *out,
                         int64_t now, char error[97]);
 bool home_parse_feed(const char *xml, size_t len, home_feed_t *out,
